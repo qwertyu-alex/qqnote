@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use crate::models::NoteMeta;
 use diesel::SqliteConnection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use models::Note;
@@ -23,18 +24,26 @@ struct AppState {
 }
 
 #[tauri::command]
-fn create_note(title: String, body: String, state: State<'_, AppState>) -> i32 {
+fn create_note(title: String, body: String, id: Option<i32>, state: State<'_, AppState>) -> i32 {
     let mut conn = state.db.lock().unwrap();
 
-    let new_note = db::create_note(&mut conn, &title, &body);
+    let new_note = db::create_note(&mut conn, &title, &body, &id);
     new_note.id
 }
 
 #[tauri::command]
-fn get_notes(state: State<'_, AppState>) -> Vec<Note> {
+fn get_notes(state: State<'_, AppState>) -> Vec<NoteMeta> {
     let mut conn = state.db.lock().unwrap();
 
     let result = db::get_notes(&mut conn);
+    result
+}
+
+#[tauri::command]
+fn get_note_text(id: i32, state: State<'_, AppState>) -> String {
+    let mut conn = state.db.lock().unwrap();
+
+    let result = db::get_note_text(&mut conn, id);
     result
 }
 
@@ -57,7 +66,11 @@ fn main() {
     tauri::Builder::default()
         .setup(setup_handler)
         // .menu(menu)
-        .invoke_handler(tauri::generate_handler![get_notes, create_note,])
+        .invoke_handler(tauri::generate_handler![
+            get_notes,
+            create_note,
+            get_note_text
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -70,7 +83,10 @@ fn setup_handler(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error +
 
     match env::var("APP_ENV") {
         Ok(_env) => {
-            main_window.set_title("qqnote in developing").unwrap();
+            // Create a string formatter that takes in the current title and appends "in developing" to it
+            let original_title = main_window.get_window("main").unwrap().title().unwrap();
+            let title = format!("{} in developing", original_title);
+            main_window.set_title(&title).unwrap();
         }
         Err(_) => {}
     }

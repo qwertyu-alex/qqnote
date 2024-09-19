@@ -13,7 +13,7 @@
 
 ### :camera: Screenshots
 
-<div align="center"> 
+<div align="center">
   <img src="public/screenshot.png" alt="screenshot" />
 </div>
 
@@ -27,7 +27,7 @@ Uses Tauri, SQLite, Preact, and Typescript
 
 ### :dart: Features
 
-- Just a lightweight note taking app
+Open fast
 
 <!-- Getting Started -->
 

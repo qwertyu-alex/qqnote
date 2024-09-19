@@ -18,4 +18,13 @@ pub struct Note {
 pub struct NewNote<'a> {
     pub title: &'a str,
     pub body: &'a str,
+    pub id: Option<i32>,
+}
+
+#[derive(Selectable, Serialize, Queryable)]
+#[diesel(table_name = note)]
+pub struct NoteMeta {
+    pub id: i32,
+    pub title: String,
+    pub created_at: chrono::NaiveDateTime,
 }

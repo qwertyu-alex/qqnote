@@ -19,10 +19,11 @@
     },
     "windows": [
       {
-        "title": "qqnote",
+        "title": "qqnote - ⌘ + t to create a new note",
         "width": 800,
         "height": 600,
-        "label": "main"
+        "label": "main",
+        "transparent": true
       }
     ],
     "security": {

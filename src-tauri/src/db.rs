@@ -5,6 +5,8 @@ use std::{fs, path};
 use dotenv::dotenv;
 use std::env;
 
+use crate::models::{NewNote, Note, NoteMeta};
+
 pub fn establish_connection() -> SqliteConnection {
     dotenv().ok();
 
@@ -31,24 +33,48 @@ pub fn establish_connection() -> SqliteConnection {
     }
 }
 
-use crate::models::{NewNote, Note};
-pub fn create_note(conn: &mut SqliteConnection, title: &str, body: &str) -> Note {
+pub fn create_note(
+    conn: &mut SqliteConnection,
+    title: &str,
+    body: &str,
+    optional_id: &Option<i32>,
+) -> Note {
     use crate::schema::note;
 
-    let new_note = NewNote { title, body };
+    let new_note = NewNote {
+        title,
+        body,
+        id: *optional_id,
+    };
 
     diesel::insert_into(note::table)
         .values(&new_note)
+        .on_conflict(note::id)
+        .do_update()
+        .set((note::title.eq(new_note.title), note::body.eq(new_note.body)))
         .returning(Note::as_returning())
         .get_result(conn)
         .expect("Error saving new note")
 }
 
-pub fn get_notes(conn: &mut SqliteConnection) -> Vec<Note> {
-    use crate::schema::note::dsl::note;
+pub fn get_notes(conn: &mut SqliteConnection) -> Vec<NoteMeta> {
+    use crate::schema::note;
+    use crate::schema::note::id;
 
-    note.limit(5)
-        .select(Note::as_select())
-        .load(conn)
+    note::dsl::note
+        .limit(50)
+        .select((note::id, note::title, note::created_at))
+        .order(id.desc())
+        .load::<NoteMeta>(conn)
+        .expect("Error loading posts")
+}
+
+pub fn get_note_text(conn: &mut SqliteConnection, id: i32) -> String {
+    use crate::schema::note;
+
+    note::dsl::note
+        .filter(note::id.eq(id))
+        .select(note::body)
+        .first(conn)
         .expect("Error loading posts")
 }

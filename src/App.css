@@ -1,5 +1,36 @@
 * {
   margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+}
+
+:root {
+  --air-padding: 5px;
+  --background-color: rgba(255, 255, 255, 0.5);
+}
+
+body {
+  background-color: var(--background-color); /* White background */
+  background-image: radial-gradient(
+      circle,
+      rgba(0, 0, 0, 0.05) 1%,
+      transparent 1%
+    ),
+    radial-gradient(circle, rgba(0, 0, 0, 0.04) 1%, transparent 1%),
+    radial-gradient(circle, rgba(0, 0, 0, 0.03) 1%, transparent 1%),
+    radial-gradient(circle, rgba(0, 0, 0, 0.02) 1%, transparent 1%);
+
+  /* Different background sizes for randomness */
+  background-size: 4px 4px, /* First layer: Slightly larger grains */ 3px 3px,
+    /* Second layer: Medium grains */ 5px 5px,
+    /* Third layer: Slightly larger */ 2px 2px; /* Fourth layer: Smaller grains */
+
+  /* Slightly offset each layer for more natural randomness */
+  background-position: 0 0, 1px 2px, 2px 1px, -1px -2px;
+}
+
+textarea {
+  background-color: transparent;
 }
 
 .shh {
@@ -9,5 +40,73 @@
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-  cursor: default;
+}
+
+#history-container {
+  user-select: none;
+  height: 100svh;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  /* background-color: #f0ead6; */
+}
+
+#history-content-container {
+  gap: var(--air-padding);
+  display: flex;
+  flex-direction: column;
+  padding-right: var(--air-padding);
+  padding-left: var(--air-padding);
+}
+
+.note-card {
+  border-color: #d6d6d6a7;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 3px; /* Smooth corners for a modern look */
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  transition: transform 0.2s ease, box-shadow 0.2s ease; /* Animation for interaction */
+  cursor: pointer;
+  overflow: hidden;
+  margin-left: var(--air-padding);
+  margin-right: var(--air-padding);
+
+  background-color: var(--background-color); /* White background */
+}
+
+.note-card:hover {
+  transform: translateY(-3px); /* Slight lift */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12); /* Slightly stronger shadow */
+  background-color: #f9f9f9; /* Slight background color change */
+}
+
+.air-element {
+  height: var(--air-padding);
+}
+.note-text {
+  width: 300px;
+  max-width: 300px;
+}
+
+.note-title {
+  margin-bottom: 0.5em;
+  width: 100%;
+  text-wrap: wrap;
+}
+
+.note-created-at {
+  font-size: 0.8em;
+  color: #888;
+}
+
+.note-card.selected {
+  transform: scale(1.03);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Additional shadow for depth */
+  font-weight: 600;
+  border-color: #a5a5a5a7;
+}
+
+/* Subtle effect for keydown (or click) */
+.button-pressed {
+  transform: scale(0.98); /* Slightly scale down */
 }
