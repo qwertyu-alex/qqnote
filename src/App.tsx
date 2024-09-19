@@ -22,16 +22,16 @@ function App() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
-  useKeyPress(["b"], (event) => {
+  useKeyPress(["b"], () => {
     setShowHistory((prev) => !prev);
   });
 
-  useKeyPress(["s"], (event) => {
+  useKeyPress(["s"], () => {
     setDebouncedValue(text);
     void save();
   });
 
-  useKeyPress(["t"], async (event) => {
+  useKeyPress(["t"], async () => {
     await save();
     setText("");
     setId(undefined);
