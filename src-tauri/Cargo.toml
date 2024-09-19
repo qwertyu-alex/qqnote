@@ -1,0 +1,25 @@
+[package]
+authors = ["you"]
+description = "A Tauri App"
+edition = "2021"
+name = "qqnote"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = {version = "1", features = [] }
+
+[dependencies]
+chrono = {version = "^0.4", features = ["serde"] }
+diesel = {version = "2.2.0", features = ["sqlite", "returning_clauses_for_sqlite_3_35", "chrono"] }
+diesel_migrations = {version = "2.0.0", features = ["sqlite"] }
+dotenv = "0.15.0"
+libsqlite3-sys = {version = "0.30", features = ["bundled"] }
+serde = {version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = {version = "1", features = ["shell-open"] }
+
+[features]
+# This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]
