@@ -33,8 +33,8 @@ function App() {
 
   useKeyPress(["t"], async () => {
     await save();
-    setText("");
     setId(undefined);
+    setText("");
   });
 
   async function save() {
