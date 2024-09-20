@@ -23,6 +23,8 @@ function App() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   useKeyPress(["b"], () => {
     setShowHistory((prev) => !prev);
   });
@@ -56,6 +58,40 @@ function App() {
     save();
   }, [debouncedValue]);
 
+  // useEffect(() => {
+  //   textareaRef.current?.addEventListener("keydown", function (e) {
+  //     if (e.key == "Tab") {
+  //       e.preventDefault();
+  //       var start = this.selectionStart;
+  //       var end = this.selectionEnd;
+
+  //       // set textarea value to: text before caret + tab + text after caret
+  //       this.value =
+  //         this.value.substring(0, start) + "\t" + this.value.substring(end);
+
+  //       // put caret at right position again
+  //       this.selectionStart = this.selectionEnd = start + 1;
+  //     }
+  //   });
+
+  //   return () => {
+  //     textareaRef.current?.removeEventListener("keydown", function (e) {
+  //       if (e.key == "Tab") {
+  //         e.preventDefault();
+  //         var start = this.selectionStart;
+  //         var end = this.selectionEnd;
+
+  //         // set textarea value to: text before caret + tab + text after caret
+  //         this.value =
+  //           this.value.substring(0, start) + "\t" + this.value.substring(end);
+
+  //         // put caret at right position again
+  //         this.selectionStart = this.selectionEnd = start + 1;
+  //       }
+  //     });
+  //   };
+  // }, [textareaRef, textareaRef.current]);
+
   useEffect(() => {
     invoke("get_notes").then((res) => {
       console.log(res);
@@ -83,6 +119,8 @@ function App() {
         outline: "none",
         display: "flex",
         overflow: "none",
+        flex: 1,
+        height: "100%",
       }}
     >
       <textarea
@@ -90,6 +128,7 @@ function App() {
         onInput={
           handleOnChange as unknown as JSX.GenericEventHandler<HTMLTextAreaElement>
         }
+        id="note-text-area"
         autoComplete={"off"}
         autoFocus={true}
         value={text}
@@ -101,9 +140,11 @@ function App() {
           padding: "1em",
           outline: "none",
           border: "none",
+          // border: "1px solid #d6d6d6a7",
           resize: "none",
-          maxHeight: "100svh",
+          boxSizing: "border-box",
         }}
+        ref={textareaRef}
       />
       {showHistory && (
         <div id="history-container">
