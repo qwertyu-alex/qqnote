@@ -27,8 +27,8 @@ struct AppState {
 fn create_note(title: String, body: String, id: Option<i32>, state: State<'_, AppState>) -> i32 {
     let mut conn = state.db.lock().unwrap();
 
-    let new_note = db::create_note(&mut conn, &title, &body, &id);
-    new_note.id
+    let note_id = db::create_note(&mut conn, &title, &body, &id);
+    note_id
 }
 
 #[tauri::command]

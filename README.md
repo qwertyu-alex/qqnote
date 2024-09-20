@@ -14,7 +14,7 @@
 ### :camera: Screenshots
 
 <div align="center">
-  <img src="public/screenshot.png" alt="screenshot" />
+  <img src="public/screenshot_v2.png" alt="screenshot" />
 </div>
 
 <!-- TechStack -->

@@ -38,8 +38,18 @@ pub fn create_note(
     title: &str,
     body: &str,
     optional_id: &Option<i32>,
-) -> Note {
+) -> i32 {
     use crate::schema::note;
+
+    if let Some(id_value) = *optional_id {
+        // optional_id exists
+        if title.is_empty() && body.is_empty() {
+            // Delete the note with this id
+            let _ = diesel::delete(note::dsl::note.filter(note::id.eq(id_value))).execute(conn);
+            // Return the id
+            return id_value;
+        }
+    }
 
     let new_note = NewNote {
         title,
@@ -47,14 +57,16 @@ pub fn create_note(
         id: *optional_id,
     };
 
-    diesel::insert_into(note::table)
+    let note_res = diesel::insert_into(note::table)
         .values(&new_note)
         .on_conflict(note::id)
         .do_update()
         .set((note::title.eq(new_note.title), note::body.eq(new_note.body)))
         .returning(Note::as_returning())
         .get_result(conn)
-        .expect("Error saving new note")
+        .expect("Error saving new note");
+
+    note_res.id
 }
 
 pub fn get_notes(conn: &mut SqliteConnection) -> Vec<NoteMeta> {

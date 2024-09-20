@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "preact/compat";
 import type { JSX } from "preact/jsx-runtime";
 import "./App.css";
 import { useDebounce, useKeyPress } from "./hooks";
+import { getRelativeDate } from "./utils";
 
 type Note = {
   id: number;
@@ -42,14 +43,13 @@ function App() {
       return;
     }
 
-    await invoke("create_note", {
+    const newId = await invoke("create_note", {
       title: getSubstring(text, 70),
       body: text,
       id,
     });
 
-    setId(id as number);
-    console.log("create_note", id);
+    setId(newId as number);
   }
 
   useEffect(() => {
@@ -82,8 +82,7 @@ function App() {
         border: "none",
         outline: "none",
         display: "flex",
-        height: "100dvh",
-        overflow: "hidden",
+        overflow: "none",
       }}
     >
       <textarea
@@ -103,6 +102,7 @@ function App() {
           outline: "none",
           border: "none",
           resize: "none",
+          maxHeight: "100svh",
         }}
       />
       {showHistory && (
@@ -173,7 +173,9 @@ function NoteCard(props: {
       <div class="note-text">
         <div class="note-text">
           <p class={"shh note-title"}>{props.title}</p>
-          <p class={"shh note-created-at"}>{props.created_at}</p>
+          <p class={"shh note-created-at"}>
+            {getRelativeDate(new Date(`${props.created_at}Z`), 7)}
+          </p>
         </div>
       </div>
     </div>
