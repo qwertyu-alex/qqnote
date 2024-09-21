@@ -53,8 +53,14 @@ textarea {
 #history-container {
   user-select: none;
   height: 100svh;
+  max-height: 100svh;
   overflow-y: scroll;
   overflow-x: hidden;
+  display: flex;
+  min-width: none;
+  max-width: none;
+  width: 250px;
+  flex-shrink: 0;
   /* background-color: #f0ead6; */
 }
 
@@ -79,7 +85,6 @@ textarea {
   margin-left: var(--air-padding);
   margin-right: var(--air-padding);
   position: relative;
-  width: 250px;
 
   background-color: var(--background-color); /* White background */
 }

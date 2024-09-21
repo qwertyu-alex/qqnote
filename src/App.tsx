@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api";
-import { createRef, useEffect, useRef, useState } from "preact/compat";
+import { useEffect, useRef, useState } from "preact/compat";
 import type { JSX } from "preact/jsx-runtime";
 import "./App.css";
 import { useDebounce, useKeyPress } from "./hooks";
-import { getRelativeDate } from "./utils";
 import { IconCloseCircle } from "./icons/IconCloseCircle";
+import { getRelativeDate } from "./utils";
 
 type Note = {
   id: number;
@@ -148,7 +148,7 @@ function App() {
         ref={textareaRef}
       />
       {showHistory && (
-        <div id="history-container shh">
+        <div id="history-container">
           <div id="history-content-container">
             <div class="air-element" />
             {notes.map((n) => (
