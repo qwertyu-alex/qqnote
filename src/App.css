@@ -78,6 +78,8 @@ textarea {
   overflow: hidden;
   margin-left: var(--air-padding);
   margin-right: var(--air-padding);
+  position: relative;
+  width: 250px;
 
   background-color: var(--background-color); /* White background */
 }
@@ -119,4 +121,21 @@ textarea {
 /* Subtle effect for keydown (or click) */
 .button-pressed {
   transform: scale(0.98); /* Slightly scale down */
+}
+
+.close-button-icon {
+  position: absolute;
+  top: -0.3em;
+  right: -0.15em;
+  cursor: pointer;
+  z-index: 1;
+  visibility: hidden;
+}
+
+.note-card-container {
+  position: relative;
+}
+
+.note-card-container:hover .close-button-icon {
+  visibility: visible;
 }

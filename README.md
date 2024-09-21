@@ -17,6 +17,11 @@
   <img src="public/screenshot_v2.png" alt="screenshot" />
 </div>
 
+<div align="center">
+  <img src="public/screenshot_size.png" alt="screenshot" />
+  <p>Only 5mb???</p> 
+</div>
+
 <!-- TechStack -->
 
 ### :space_invader: Tech Stack

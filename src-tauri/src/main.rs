@@ -47,6 +47,14 @@ fn get_note_text(id: i32, state: State<'_, AppState>) -> String {
     result
 }
 
+#[tauri::command]
+fn delete_note(id: i32, state: State<'_, AppState>) -> bool {
+    let mut conn = state.db.lock().unwrap();
+
+    let result = db::delete_note(&mut conn, id);
+    result
+}
+
 fn main() {
     // here `"quit".to_string()` defines the menu item id, and the second parameter is the menu item label.
     // let quit = CustomMenuItem::new("quit".to_string(), "Quit");
@@ -69,7 +77,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_notes,
             create_note,
-            get_note_text
+            get_note_text,
+            delete_note
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -90,20 +99,6 @@ fn setup_handler(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error +
         }
         Err(_) => {}
     }
-
-    // let app_data_dir_path = app_handle
-    //     .path_resolver()
-    //     .app_data_dir()
-    //     .unwrap_or(std::path::PathBuf::new());
-
-    // let db_name = "app_data.db";
-    // let dir = Path::new(&app_data_dir_path);
-    // let production_path = dir.join(db_name).to_str().unwrap().to_string();
-
-    // Initialize the SQLite database at app startup
-    // let conn = Connection::open(path).expect("Failed to open the database");
-
-    // initialize_db(&conn).unwrap();
 
     app.manage(AppState {
         db: Mutex::new(connection), // Store the connection in the AppState, wrapped in a Mutex

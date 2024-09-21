@@ -1,9 +1,10 @@
 import { invoke } from "@tauri-apps/api";
-import { useEffect, useRef, useState } from "preact/compat";
+import { createRef, useEffect, useRef, useState } from "preact/compat";
 import type { JSX } from "preact/jsx-runtime";
 import "./App.css";
 import { useDebounce, useKeyPress } from "./hooks";
 import { getRelativeDate } from "./utils";
+import { IconCloseCircle } from "./icons/IconCloseCircle";
 
 type Note = {
   id: number;
@@ -58,40 +59,6 @@ function App() {
     save();
   }, [debouncedValue]);
 
-  // useEffect(() => {
-  //   textareaRef.current?.addEventListener("keydown", function (e) {
-  //     if (e.key == "Tab") {
-  //       e.preventDefault();
-  //       var start = this.selectionStart;
-  //       var end = this.selectionEnd;
-
-  //       // set textarea value to: text before caret + tab + text after caret
-  //       this.value =
-  //         this.value.substring(0, start) + "\t" + this.value.substring(end);
-
-  //       // put caret at right position again
-  //       this.selectionStart = this.selectionEnd = start + 1;
-  //     }
-  //   });
-
-  //   return () => {
-  //     textareaRef.current?.removeEventListener("keydown", function (e) {
-  //       if (e.key == "Tab") {
-  //         e.preventDefault();
-  //         var start = this.selectionStart;
-  //         var end = this.selectionEnd;
-
-  //         // set textarea value to: text before caret + tab + text after caret
-  //         this.value =
-  //           this.value.substring(0, start) + "\t" + this.value.substring(end);
-
-  //         // put caret at right position again
-  //         this.selectionStart = this.selectionEnd = start + 1;
-  //       }
-  //     });
-  //   };
-  // }, [textareaRef, textareaRef.current]);
-
   useEffect(() => {
     invoke("get_notes").then((res) => {
       console.log(res);
@@ -99,16 +66,49 @@ function App() {
     });
   }, [debouncedValue]);
 
-  function handleOnChange(e: { target: { value: string } }) {
-    setText(e.target.value);
+  function handleOnChange(e: JSX.TargetedInputEvent<HTMLTextAreaElement>) {
+    if (!e) {
+      return;
+    }
+
+    setText(e.currentTarget?.value ?? "");
   }
 
-  function handleNoteChange(id: number) {
+  const handleOnKeyDown: JSX.KeyboardEventHandler<HTMLTextAreaElement> = (
+    e
+  ) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const textarea = textareaRef.current;
+      if (!textarea) {
+        return;
+      }
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+
+      // Insert a tab character at the cursor position
+      const newValue = text.substring(0, start) + "\t" + text.substring(end);
+      setText(newValue);
+
+      // Update the cursor position after the value is set
+      textarea.selectionStart = textarea.selectionEnd = start + 1;
+      return;
+    }
+  };
+
+  async function handleNoteChange(id: number | undefined) {
     setId(id);
-    invoke("get_note_text", { id }).then((res) => {
-      handleOnChange({ target: { value: res as string } });
-      setText(res as string);
-    });
+
+    if (id === undefined) {
+      setText("");
+    } else {
+      const newText: string = await invoke("get_note_text", { id });
+      setText(newText);
+    }
+
+    const notes: Note[] = await invoke("get_notes");
+    setNotes(notes);
   }
 
   return (
@@ -126,8 +126,9 @@ function App() {
       <textarea
         placeholder="⌘ + b to show history"
         onInput={
-          handleOnChange as unknown as JSX.GenericEventHandler<HTMLTextAreaElement>
+          handleOnChange as unknown as JSX.InputEventHandler<HTMLTextAreaElement>
         }
+        onKeyDown={handleOnKeyDown}
         id="note-text-area"
         autoComplete={"off"}
         autoFocus={true}
@@ -147,7 +148,7 @@ function App() {
         ref={textareaRef}
       />
       {showHistory && (
-        <div id="history-container">
+        <div id="history-container shh">
           <div id="history-content-container">
             <div class="air-element" />
             {notes.map((n) => (
@@ -171,7 +172,7 @@ function NoteCard(props: {
   id: number;
   title: string;
   created_at: string;
-  handleNoteChange: (id: number) => void;
+  handleNoteChange: (id: number | undefined) => void;
   selected?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -183,42 +184,57 @@ function NoteCard(props: {
     }
 
     // Add keydown event
-    document.addEventListener("mousedown", function () {
+    button.addEventListener("mousedown", function () {
       button.classList.add("button-pressed");
-      console.log("mousedown");
     });
 
     // Remove the class when the key is released
-    document.addEventListener("mouseup", function () {
+    button.addEventListener("mouseup", function () {
       button.classList.remove("button-pressed");
     });
 
     return () => {
-      document.removeEventListener("mousedown", function () {
-        button?.classList.remove("button-pressed");
+      button.removeEventListener("mousedown", function () {
+        button.classList.remove("button-pressed");
       });
 
-      document.removeEventListener("mouseup", function () {
-        button?.classList.remove("button-pressed");
+      button.removeEventListener("mouseup", function () {
+        button.classList.remove("button-pressed");
       });
     };
   }, [ref, button]);
 
+  function handleDelete() {
+    console.log("delete", props.id);
+
+    invoke("delete_note", { id: props.id }).then((res) => {
+      if (res) {
+        props.handleNoteChange(undefined);
+      }
+    });
+  }
+
   return (
-    <div
-      class={"note-card shh" + (props.selected ? " selected" : "")}
-      ref={ref}
-      key={props.id}
-      onClick={() => props.handleNoteChange(props.id)}
-    >
-      <div class="note-text">
+    <div class={"note-card-container"}>
+      <div
+        class={"note-card shh" + (props.selected ? " selected" : "")}
+        ref={ref}
+        key={props.id}
+        onClick={() => props.handleNoteChange(props.id)}
+      >
         <div class="note-text">
-          <p class={"shh note-title"}>{props.title}</p>
-          <p class={"shh note-created-at"}>
-            {getRelativeDate(new Date(`${props.created_at}Z`), 7)}
-          </p>
+          <div class="note-text">
+            <p class={"shh note-title"}>{props.title}</p>
+            <p class={"shh note-created-at"}>
+              {getRelativeDate(new Date(`${props.created_at}Z`), 7)}
+            </p>
+          </div>
         </div>
       </div>
+      <IconCloseCircle
+        className={"close-button-icon shh"}
+        onClick={handleDelete}
+      />
     </div>
   );
 }

@@ -90,3 +90,11 @@ pub fn get_note_text(conn: &mut SqliteConnection, id: i32) -> String {
         .first(conn)
         .expect("Error loading posts")
 }
+
+pub fn delete_note(conn: &mut SqliteConnection, id: i32) -> bool {
+    use crate::schema::note;
+
+    let _ = diesel::delete(note::dsl::note.filter(note::id.eq(id))).execute(conn);
+
+    true
+}
