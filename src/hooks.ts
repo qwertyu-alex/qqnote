@@ -48,10 +48,10 @@ export function useKeyPress(
     // target is either the provided node or the document
     const targetNode = node ?? document;
     // attach the event listener
-    targetNode && targetNode.addEventListener("keydown", handleKeyPress);
+    targetNode?.addEventListener("keydown", handleKeyPress);
 
     // remove the event listener
     return () =>
-      targetNode && targetNode.removeEventListener("keydown", handleKeyPress);
+      targetNode?.removeEventListener("keydown", handleKeyPress);
   }, [handleKeyPress, node]);
 }

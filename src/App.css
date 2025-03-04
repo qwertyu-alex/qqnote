@@ -39,6 +39,7 @@ body {
 
 textarea {
   background-color: transparent;
+  tab-size: 4;
 }
 
 .shh {

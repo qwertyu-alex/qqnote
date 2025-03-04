@@ -3,8 +3,7 @@ import { useEffect, useRef, useState } from "preact/compat";
 import type { JSX } from "preact/jsx-runtime";
 import "./App.css";
 import { useDebounce, useKeyPress } from "./hooks";
-import { IconCloseCircle } from "./icons/IconCloseCircle";
-import { getRelativeDate } from "./utils";
+import { NoteCard } from "./components/notecard";
 
 type Note = {
   id: number;
@@ -42,7 +41,7 @@ function App() {
   });
 
   async function save() {
-    if (text.length === 0 && !Boolean(id)) {
+    if (text.length === 0 && !id) {
       return;
     }
 
@@ -55,10 +54,12 @@ function App() {
     setId(newId as number);
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     save();
   }, [debouncedValue]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     invoke("get_notes").then((res) => {
       console.log(res);
@@ -88,11 +89,13 @@ function App() {
       const end = textarea.selectionEnd;
 
       // Insert a tab character at the cursor position
-      const newValue = text.substring(0, start) + "\t" + text.substring(end);
+      const newValue = `${text.substring(0, start)}\t${text.substring(end)}`;
       setText(newValue);
 
-      // Update the cursor position after the value is set
-      textarea.selectionStart = textarea.selectionEnd = start + 1;
+      // Use setTimeout to ensure the DOM has updated
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 1;
+      }, 0);
       return;
     }
   };
@@ -123,6 +126,18 @@ function App() {
         height: "100%",
       }}
     >
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "10px",
+          zIndex: 9999,
+          borderTopLeftRadius: "var(--border-radius)",
+          borderTopRightRadius: "var(--border-radius)",
+        }}
+      />
       <textarea
         placeholder="⌘ + b to show history"
         onInput={
@@ -131,6 +146,7 @@ function App() {
         onKeyDown={handleOnKeyDown}
         id="note-text-area"
         autoComplete={"off"}
+        // biome-ignore lint/a11y/noAutofocus: <explanation>
         autoFocus={true}
         value={text}
         style={{
@@ -141,9 +157,10 @@ function App() {
           padding: "1em",
           outline: "none",
           border: "none",
-          // border: "1px solid #d6d6d6a7",
           resize: "none",
           boxSizing: "border-box",
+          backgroundColor: "transparent",
+          borderRadius: "var(--border-radius)",
         }}
         ref={textareaRef}
       />
@@ -153,6 +170,7 @@ function App() {
             <div class="air-element" />
             {notes.map((n) => (
               <NoteCard
+                key={n.id}
                 id={n.id}
                 title={n.title}
                 created_at={n.created_at}
@@ -164,77 +182,6 @@ function App() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function NoteCard(props: {
-  id: number;
-  title: string;
-  created_at: string;
-  handleNoteChange: (id: number | undefined) => void;
-  selected?: boolean;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const button = ref.current;
-
-  useEffect(() => {
-    if (!button) {
-      return;
-    }
-
-    // Add keydown event
-    button.addEventListener("mousedown", function () {
-      button.classList.add("button-pressed");
-    });
-
-    // Remove the class when the key is released
-    button.addEventListener("mouseup", function () {
-      button.classList.remove("button-pressed");
-    });
-
-    return () => {
-      button.removeEventListener("mousedown", function () {
-        button.classList.remove("button-pressed");
-      });
-
-      button.removeEventListener("mouseup", function () {
-        button.classList.remove("button-pressed");
-      });
-    };
-  }, [ref, button]);
-
-  function handleDelete() {
-    console.log("delete", props.id);
-
-    invoke("delete_note", { id: props.id }).then((res) => {
-      if (res) {
-        props.handleNoteChange(undefined);
-      }
-    });
-  }
-
-  return (
-    <div class={"note-card-container"}>
-      <div
-        class={"note-card shh" + (props.selected ? " selected" : "")}
-        ref={ref}
-        key={props.id}
-        onClick={() => props.handleNoteChange(props.id)}
-      >
-        <div class="note-text">
-          <div class="note-text">
-            <p class={"shh note-title"}>{props.title}</p>
-            <p class={"shh note-created-at"}>
-              {getRelativeDate(new Date(`${props.created_at}Z`), 7)}
-            </p>
-          </div>
-        </div>
-      </div>
-      <IconCloseCircle
-        className={"close-button-icon shh"}
-        onClick={handleDelete}
-      />
     </div>
   );
 }
