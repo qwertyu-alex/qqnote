@@ -178,6 +178,7 @@ function App() {
         <div id="history-container">
           <div id="history-content-container">
             <div class="air-element" />
+            <div class="air-element" />
             {notes.map((n) => (
               <NoteCard
                 key={n.id}
@@ -188,6 +189,9 @@ function App() {
                 selected={id === n.id}
               />
             ))}
+            <div class="air-element" />
+            <div class="air-element" />
+            <div class="air-element" />
             <div class="air-element" />
           </div>
         </div>

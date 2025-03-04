@@ -1,4 +1,32 @@
+import { useState, useEffect } from "preact/hooks";
+
 export function StatusBar(props: { text: string }) {
+  const [selectedText, setSelectedText] = useState<string>("");
+  const [selectedRows, setSelectedRows] = useState<number>(0);
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (selection && selection.toString()) {
+        // Get selected text
+        const text = selection.toString();
+        setSelectedText(text);
+
+        // Count number of rows in selection
+        const rowCount = text.split("\n").length;
+        setSelectedRows(rowCount);
+      } else {
+        setSelectedText("");
+        setSelectedRows(0);
+      }
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, []);
+
   return (
     <div
       style={{
@@ -12,11 +40,22 @@ export function StatusBar(props: { text: string }) {
         WebkitBackdropFilter: "blur(10px)",
         padding: "0 10px",
         display: "flex",
-        alignItems: "center",
         fontSize: "12px",
+        gap: "10px",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        MozUserSelect: "none",
+        msUserSelect: "none",
       }}
     >
-      Chars: {props.text.length}
+      <p>C: {props.text.length}</p>
+      <p>W: {props.text.split(/\s+/).length}</p>
+      {selectedText && (
+        <p>
+          Selected: C {selectedText.length} | {selectedRows}{" "}
+          {selectedRows === 1 ? "row" : "rows"}
+        </p>
+      )}
     </div>
   );
 }
