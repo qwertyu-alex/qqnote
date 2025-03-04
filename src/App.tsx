@@ -4,7 +4,7 @@ import type { JSX } from "preact/jsx-runtime";
 import "./App.css";
 import { useDebounce, useKeyPress } from "./hooks";
 import { NoteCard } from "./components/notecard";
-
+import { StatusBar } from "./components/status-bar";
 type Note = {
   id: number;
   title: string;
@@ -138,32 +138,42 @@ function App() {
           borderTopRightRadius: "var(--border-radius)",
         }}
       />
-      <textarea
-        placeholder="⌘ + b to show history"
-        onInput={
-          handleOnChange as unknown as JSX.InputEventHandler<HTMLTextAreaElement>
-        }
-        onKeyDown={handleOnKeyDown}
-        id="note-text-area"
-        autoComplete={"off"}
-        // biome-ignore lint/a11y/noAutofocus: <explanation>
-        autoFocus={true}
-        value={text}
+      <div
         style={{
-          fontSize: "1em",
-          minHeight: "100%",
-          width: "100%",
-          margin: "0px",
-          padding: "1em",
-          outline: "none",
-          border: "none",
-          resize: "none",
-          boxSizing: "border-box",
-          backgroundColor: "transparent",
-          borderRadius: "var(--border-radius)",
+          flex: 1,
+          overflow: "visible",
+          display: "relative",
+          paddingBottom: "10px",
         }}
-        ref={textareaRef}
-      />
+      >
+        <textarea
+          placeholder="⌘ + b to show history"
+          onInput={
+            handleOnChange as unknown as JSX.InputEventHandler<HTMLTextAreaElement>
+          }
+          onKeyDown={handleOnKeyDown}
+          id="note-text-area"
+          autoComplete={"off"}
+          // biome-ignore lint/a11y/noAutofocus: <explanation>
+          autoFocus={true}
+          value={text}
+          style={{
+            fontSize: "1em",
+            minHeight: "100vh",
+            width: "100%",
+            margin: "0px",
+            padding: "1em",
+            outline: "none",
+            border: "none",
+            resize: "none",
+            boxSizing: "border-box",
+            backgroundColor: "transparent",
+            borderRadius: "var(--border-radius)",
+          }}
+          ref={textareaRef}
+        />
+        <StatusBar text={text} />
+      </div>
       {showHistory && (
         <div id="history-container">
           <div id="history-content-container">
