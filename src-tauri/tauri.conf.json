@@ -15,6 +15,20 @@
       "shell": {
         "all": false,
         "open": true
+      },
+      "path": {
+        "all": true
+      },
+      "fs": {
+        "all": true,
+        "writeFile": true,
+        "readFile": true,
+        "scope": ["$DOWNLOAD/**"]
+      },
+      "clipboard": {
+        "all": true,
+        "writeText": true,
+        "readText": true
       }
     },
     "windows": [

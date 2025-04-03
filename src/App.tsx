@@ -5,10 +5,16 @@ import "./App.css";
 import { useDebounce, useKeyPress } from "./hooks";
 import { NoteCard } from "./components/notecard";
 import { StatusBar } from "./components/status-bar";
+import { dialog } from "@tauri-apps/api";
+import { writeTextFile } from "@tauri-apps/api/fs";
+import { listen } from "@tauri-apps/api/event";
+import { downloadDir } from "@tauri-apps/api/path";
+
 type Note = {
   id: number;
   title: string;
   created_at: string;
+  body: string;
 };
 
 function getSubstring(str: string, length: number): string {
@@ -31,11 +37,11 @@ function App() {
 
   useKeyPress(["s"], () => {
     setDebouncedValue(text);
-    void save();
+    void dialog.save();
   });
 
   useKeyPress(["t"], async () => {
-    await save();
+    await dialog.save();
     setId(undefined);
     setText("");
   });
@@ -113,6 +119,42 @@ function App() {
     const notes: Note[] = await invoke("get_notes");
     setNotes(notes);
   }
+
+  async function handleExport() {
+    try {
+      console.log("Starting export process...");
+      console.log("Calling export_notes command...");
+      const notes = await invoke("export_notes");
+      console.log("Received notes:", notes);
+
+      const jsonString = JSON.stringify(notes, null, 2);
+      console.log("Generated JSON string");
+
+      console.log("Getting downloads directory...");
+      const downloadsPath = await downloadDir();
+      console.log("Downloads path:", downloadsPath);
+
+      const filePath = `${downloadsPath}/notes.json`;
+      console.log("Attempting to write file to:", filePath);
+
+      await writeTextFile(filePath, jsonString);
+      console.log("File written successfully!");
+    } catch (error) {
+      console.error("Error in export process:", error);
+    }
+  }
+
+  // Add menu event listener
+  useEffect(() => {
+    console.log("Setting up menu event listener...");
+    const unlisten = listen("export", (event) => {
+      console.log("Export event received:", event);
+      handleExport();
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
 
   return (
     <div

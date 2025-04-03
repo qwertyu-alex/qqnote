@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use crate::models::NoteMeta;
+use diesel::prelude::*;
 use diesel::SqliteConnection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use models::Note;
@@ -55,15 +56,20 @@ fn delete_note(id: i32, state: State<'_, AppState>) -> bool {
     result
 }
 
+#[tauri::command]
+fn export_notes(state: State<'_, AppState>) -> Vec<Note> {
+    println!("Exporting notes from database...");
+    let mut conn = state.db.lock().unwrap();
+    use crate::schema::note;
+    let notes = note::dsl::note
+        .select((note::id, note::title, note::body, note::created_at))
+        .load(&mut *conn)
+        .expect("Error loading notes for export");
+    println!("Successfully loaded {} notes for export", notes.len());
+    notes
+}
+
 fn main() {
-    // here `"quit".to_string()` defines the menu item id, and the second parameter is the menu item label.
-    // let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-    // let close = CustomMenuItem::new("close".to_string(), "Close");
-    // let submenu = Submenu::new("File", Menu::new().add_item(quit).add_item(close));
-    // let menu = Menu::new()
-    //     .add_native_item(MenuItem::Copy)
-    //     .add_item(CustomMenuItem::new("hide", "Hide"))
-    //     .add_submenu(submenu);
     let mut connection = db::establish_connection();
     connection
         .run_pending_migrations(MIGRATIONS)
@@ -71,14 +77,43 @@ fn main() {
 
     println!("App started!");
 
+    // Create menu items
+    let export = CustomMenuItem::new("export".to_string(), "Export Notes");
+    let file_submenu = Submenu::new("File", Menu::new().add_item(export));
+
+    // Create Edit submenu with native items
+    let edit_submenu = Submenu::new(
+        "Edit",
+        Menu::new()
+            .add_native_item(MenuItem::Copy)
+            .add_native_item(MenuItem::Paste)
+            .add_native_item(MenuItem::SelectAll),
+    );
+
+    let menu = Menu::new()
+        .add_submenu(file_submenu)
+        .add_submenu(edit_submenu);
+
     tauri::Builder::default()
         .setup(setup_handler)
-        // .menu(menu)
+        .menu(menu)
+        .on_menu_event(|event| {
+            println!("Menu event received: {}", event.menu_item_id());
+            match event.menu_item_id() {
+                "export" => {
+                    println!("Export menu item clicked, emitting event...");
+                    event.window().emit("export", ()).unwrap();
+                    println!("Export event emitted");
+                }
+                _ => {}
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             get_notes,
             create_note,
             get_note_text,
-            delete_note
+            delete_note,
+            export_notes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
