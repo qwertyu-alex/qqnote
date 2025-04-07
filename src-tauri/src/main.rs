@@ -78,8 +78,10 @@ fn main() {
     println!("App started!");
 
     // Create menu items
+    let new_note =
+        CustomMenuItem::new("new_note".to_string(), "New Note").accelerator("CommandOrControl+T");
     let export = CustomMenuItem::new("export".to_string(), "Export Notes");
-    let file_submenu = Submenu::new("File", Menu::new().add_item(export));
+    let file_submenu = Submenu::new("File", Menu::new().add_item(new_note).add_item(export));
 
     // Create Edit submenu with native items
     let edit_submenu = Submenu::new(
@@ -87,7 +89,15 @@ fn main() {
         Menu::new()
             .add_native_item(MenuItem::Copy)
             .add_native_item(MenuItem::Paste)
-            .add_native_item(MenuItem::SelectAll),
+            .add_native_item(MenuItem::SelectAll)
+            .add_native_item(MenuItem::ShowAll)
+            .add_native_item(MenuItem::EnterFullScreen)
+            .add_native_item(MenuItem::Minimize)
+            .add_native_item(MenuItem::Undo)
+            .add_native_item(MenuItem::Redo)
+            .add_native_item(MenuItem::Zoom)
+            .add_native_item(MenuItem::Cut)
+            .add_native_item(MenuItem::CloseWindow),
     );
 
     let menu = Menu::new()
@@ -104,6 +114,11 @@ fn main() {
                     println!("Export menu item clicked, emitting event...");
                     event.window().emit("export", ()).unwrap();
                     println!("Export event emitted");
+                }
+                "new_note" => {
+                    println!("New note menu item clicked, emitting event...");
+                    event.window().emit("new_note", ()).unwrap();
+                    println!("New note event emitted");
                 }
                 _ => {}
             }

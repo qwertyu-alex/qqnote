@@ -51,7 +51,6 @@ export function useKeyPress(
     targetNode?.addEventListener("keydown", handleKeyPress);
 
     // remove the event listener
-    return () =>
-      targetNode?.removeEventListener("keydown", handleKeyPress);
+    return () => targetNode?.removeEventListener("keydown", handleKeyPress);
   }, [handleKeyPress, node]);
 }
