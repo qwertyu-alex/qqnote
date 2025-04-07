@@ -97,6 +97,7 @@ fn main() {
             .add_native_item(MenuItem::Redo)
             .add_native_item(MenuItem::Zoom)
             .add_native_item(MenuItem::Cut)
+            .add_native_item(MenuItem::Quit)
             .add_native_item(MenuItem::CloseWindow),
     );
 

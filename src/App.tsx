@@ -147,19 +147,12 @@ function App() {
   // Add menu event listener
   useEffect(() => {
     console.log("Setting up menu event listener...");
-    const unlistenExport = listen("export", (event) => {
+    const unlisten = listen("export", (event) => {
       console.log("Export event received:", event);
       handleExport();
     });
-    const unlistenNewNote = listen("new_note", (event) => {
-      console.log("New note event received:", event);
-      void dialog.save();
-      setId(undefined);
-      setText("");
-    });
     return () => {
-      unlistenExport.then((fn) => fn());
-      unlistenNewNote.then((fn) => fn());
+      unlisten.then((fn) => fn());
     };
   }, []);
 
