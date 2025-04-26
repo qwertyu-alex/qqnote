@@ -6,6 +6,7 @@ use dotenv::dotenv;
 use std::env;
 
 use crate::models::{NewNote, Note, NoteMeta};
+use crate::schema::note;
 
 pub fn establish_connection() -> SqliteConnection {
     dotenv().ok();
@@ -97,4 +98,11 @@ pub fn delete_note(conn: &mut SqliteConnection, id: i32) -> bool {
     let _ = diesel::delete(note::dsl::note.filter(note::id.eq(id))).execute(conn);
 
     true
+}
+
+pub fn get_note_meta(conn: &mut SqliteConnection, id: i32) -> QueryResult<NoteMeta> {
+    note::table
+        .filter(note::id.eq(id))
+        .select((note::id, note::title, note::created_at))
+        .first::<NoteMeta>(conn)
 }

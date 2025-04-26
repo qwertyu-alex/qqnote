@@ -1,14 +1,14 @@
-import { invoke } from "@tauri-apps/api";
+import { dialog, invoke } from "@tauri-apps/api";
+import { open } from "@tauri-apps/api/dialog";
+import { listen } from "@tauri-apps/api/event";
+import { writeTextFile } from "@tauri-apps/api/fs";
+import { downloadDir } from "@tauri-apps/api/path";
 import { useEffect, useRef, useState } from "preact/compat";
 import type { JSX } from "preact/jsx-runtime";
 import "./App.css";
-import { useDebounce, useKeyPress } from "./hooks";
 import { NoteCard } from "./components/notecard";
 import { StatusBar } from "./components/status-bar";
-import { dialog } from "@tauri-apps/api";
-import { writeTextFile } from "@tauri-apps/api/fs";
-import { listen } from "@tauri-apps/api/event";
-import { downloadDir } from "@tauri-apps/api/path";
+import { useDebounce, useKeyPress } from "./hooks";
 
 type Note = {
   id: number;
@@ -144,15 +144,53 @@ function App() {
     }
   }
 
-  // Add menu event listener
+  async function handleImport() {
+    try {
+      console.log("Starting import process...");
+      const selected = await open({
+        filters: [
+          {
+            name: "JSON",
+            extensions: ["json"],
+          },
+        ],
+      });
+
+      if (!selected) {
+        console.log("No file selected");
+        return;
+      }
+
+      console.log("Selected file:", selected);
+      const importedNotes = await invoke("import_notes", {
+        jsonPath: selected,
+      });
+      console.log("Notes imported successfully:", importedNotes);
+
+      // Refresh notes list
+      const notes = await invoke("get_notes");
+      setNotes(notes as Note[]);
+    } catch (error) {
+      console.error("Error in import process:", error);
+    }
+  }
+
+  // Add menu event listeners
   useEffect(() => {
-    console.log("Setting up menu event listener...");
-    const unlisten = listen("export", (event) => {
+    console.log("Setting up menu event listeners...");
+    const unlistenExport = listen("export", (event) => {
       console.log("Export event received:", event);
       handleExport();
     });
+
+    const unlistenImport = listen("import", (event) => {
+      console.log("Import event received:", event);
+      handleImport();
+    });
+
     return () => {
-      unlisten.then((fn) => fn());
+      unlistenExport.then((fn) => fn());
+      unlistenImport.then((fn) => fn());
     };
   }, []);
 

@@ -69,6 +69,31 @@ fn export_notes(state: State<'_, AppState>) -> Vec<Note> {
     notes
 }
 
+#[tauri::command]
+fn import_notes(json_path: String, state: State<'_, AppState>) -> Result<Vec<NoteMeta>, String> {
+    println!("Importing notes from: {}", json_path);
+    let mut conn = state.db.lock().unwrap();
+
+    // Read and parse the JSON file
+    let json_content =
+        std::fs::read_to_string(&json_path).map_err(|e| format!("Failed to read file: {}", e))?;
+
+    let notes: Vec<Note> =
+        serde_json::from_str(&json_content).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+    let mut imported_notes = Vec::new();
+
+    for note in notes {
+        // Create new note without ID to avoid conflicts
+        let new_id = db::create_note(&mut conn, &note.title, &note.body, &None);
+        if let Ok(meta) = db::get_note_meta(&mut conn, new_id) {
+            imported_notes.push(meta);
+        }
+    }
+
+    Ok(imported_notes)
+}
+
 fn main() {
     let mut connection = db::establish_connection();
     connection
@@ -81,7 +106,14 @@ fn main() {
     let new_note =
         CustomMenuItem::new("new_note".to_string(), "New Note").accelerator("CommandOrControl+T");
     let export = CustomMenuItem::new("export".to_string(), "Export Notes");
-    let file_submenu = Submenu::new("File", Menu::new().add_item(new_note).add_item(export));
+    let import = CustomMenuItem::new("import".to_string(), "Import Notes");
+    let file_submenu = Submenu::new(
+        "File",
+        Menu::new()
+            .add_item(new_note)
+            .add_item(export)
+            .add_item(import),
+    );
 
     // Create Edit submenu with native items
     let edit_submenu = Submenu::new(
@@ -116,6 +148,11 @@ fn main() {
                     event.window().emit("export", ()).unwrap();
                     println!("Export event emitted");
                 }
+                "import" => {
+                    println!("Import menu item clicked, emitting event...");
+                    event.window().emit("import", ()).unwrap();
+                    println!("Import event emitted");
+                }
                 "new_note" => {
                     println!("New note menu item clicked, emitting event...");
                     event.window().emit("new_note", ()).unwrap();
@@ -129,14 +166,15 @@ fn main() {
             create_note,
             get_note_text,
             delete_note,
-            export_notes
+            export_notes,
+            import_notes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
 fn setup_handler(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error + 'static>> {
-    let mut connection = db::establish_connection();
+    let connection = db::establish_connection();
 
     let app_handle = app.handle();
     let main_window = app.get_window("main").unwrap();

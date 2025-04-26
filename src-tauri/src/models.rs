@@ -1,9 +1,9 @@
 use crate::schema::note;
 use diesel::prelude::*;
 use diesel::sql_types::{Text, Timestamp};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Queryable, Selectable, Serialize)]
+#[derive(Debug, Queryable, Serialize, Deserialize, Selectable)]
 #[diesel(table_name = crate::schema::note)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Note {
