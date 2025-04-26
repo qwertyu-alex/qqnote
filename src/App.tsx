@@ -41,7 +41,6 @@ function App() {
   });
 
   useKeyPress(["t"], async () => {
-    await dialog.save();
     setId(undefined);
     setText("");
   });
