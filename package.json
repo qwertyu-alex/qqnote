@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tauri": "pnpm dev && pnpm tauri dev",
     "build": "tsc && vite build",
+    "build:tauri": "pnpm build && pnpm tauri build",
     "preview": "vite preview",
     "tauri": "export EMBED_INFO_PLIST=false && tauri"
   },
