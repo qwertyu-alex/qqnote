@@ -10,8 +10,8 @@ use serde::Serialize;
 use std::env;
 use std::path::Path;
 use std::sync::Mutex;
-use tauri::{CustomMenuItem, Menu, MenuItem, Submenu};
-use tauri::{Manager, State};
+use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 mod db;
 mod models;
@@ -102,60 +102,27 @@ fn main() {
 
     println!("App started!");
 
-    // Create menu items
-    let new_note =
-        CustomMenuItem::new("new_note".to_string(), "New Note").accelerator("CommandOrControl+T");
-    let export = CustomMenuItem::new("export".to_string(), "Export Notes");
-    let import = CustomMenuItem::new("import".to_string(), "Import Notes");
-    let file_submenu = Submenu::new(
-        "File",
-        Menu::new()
-            .add_item(new_note)
-            .add_item(export)
-            .add_item(import),
-    );
-
-    // Create Edit submenu with native items
-    let edit_submenu = Submenu::new(
-        "Edit",
-        Menu::new()
-            .add_native_item(MenuItem::Copy)
-            .add_native_item(MenuItem::Paste)
-            .add_native_item(MenuItem::SelectAll)
-            .add_native_item(MenuItem::ShowAll)
-            .add_native_item(MenuItem::EnterFullScreen)
-            .add_native_item(MenuItem::Minimize)
-            .add_native_item(MenuItem::Undo)
-            .add_native_item(MenuItem::Redo)
-            .add_native_item(MenuItem::Zoom)
-            .add_native_item(MenuItem::Cut)
-            .add_native_item(MenuItem::Quit)
-            .add_native_item(MenuItem::CloseWindow),
-    );
-
-    let menu = Menu::new()
-        .add_submenu(file_submenu)
-        .add_submenu(edit_submenu);
-
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(setup_handler)
-        .menu(menu)
-        .on_menu_event(|event| {
-            println!("Menu event received: {}", event.menu_item_id());
-            match event.menu_item_id() {
+        .menu(build_menu)
+        .on_menu_event(|app, event| {
+            println!("Menu event received: {}", event.id().as_ref());
+            match event.id().as_ref() {
                 "export" => {
                     println!("Export menu item clicked, emitting event...");
-                    event.window().emit("export", ()).unwrap();
+                    app.emit("export", ()).unwrap();
                     println!("Export event emitted");
                 }
                 "import" => {
                     println!("Import menu item clicked, emitting event...");
-                    event.window().emit("import", ()).unwrap();
+                    app.emit("import", ()).unwrap();
                     println!("Import event emitted");
                 }
                 "new_note" => {
                     println!("New note menu item clicked, emitting event...");
-                    event.window().emit("new_note", ()).unwrap();
+                    app.emit("new_note", ()).unwrap();
                     println!("New note event emitted");
                 }
                 _ => {}
@@ -173,16 +140,50 @@ fn main() {
         .expect("error while running tauri application");
 }
 
+fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    // Create menu items
+    let new_note = MenuItemBuilder::with_id("new_note", "New Note")
+        .accelerator("CommandOrControl+T")
+        .build(app)?;
+    let export = MenuItemBuilder::with_id("export", "Export Notes").build(app)?;
+    let import = MenuItemBuilder::with_id("import", "Import Notes").build(app)?;
+    let file_submenu = SubmenuBuilder::new(app, "File")
+        .item(&new_note)
+        .item(&export)
+        .item(&import)
+        .build()?;
+
+    // Create Edit submenu with native items
+    let edit_submenu = SubmenuBuilder::new(app, "Edit")
+        .copy()
+        .paste()
+        .select_all()
+        .show_all()
+        .fullscreen()
+        .minimize()
+        .undo()
+        .redo()
+        .maximize()
+        .cut()
+        .quit()
+        .close_window()
+        .build()?;
+
+    MenuBuilder::new(app)
+        .item(&file_submenu)
+        .item(&edit_submenu)
+        .build()
+}
+
 fn setup_handler(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error + 'static>> {
     let connection = db::establish_connection();
 
-    let app_handle = app.handle();
-    let main_window = app.get_window("main").unwrap();
+    let main_window = app.get_webview_window("main").unwrap();
 
     match env::var("APP_ENV") {
         Ok(_env) => {
             // Create a string formatter that takes in the current title and appends "in developing" to it
-            let original_title = main_window.get_window("main").unwrap().title().unwrap();
+            let original_title = main_window.title().unwrap();
             let title = format!("{} in developing", original_title);
             main_window.set_title(&title).unwrap();
         }
@@ -193,144 +194,32 @@ fn setup_handler(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error +
         db: Mutex::new(connection), // Store the connection in the AppState, wrapped in a Mutex
     });
 
-    println!(
-        "{}",
-        app_handle
-            .path_resolver()
-            .resource_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        app_handle
-            .path_resolver()
-            .app_config_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        app_handle
-            .path_resolver()
-            .app_data_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        app_handle
-            .path_resolver()
-            .app_local_data_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        app_handle
-            .path_resolver()
-            .app_cache_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        app_handle
-            .path_resolver()
-            .app_log_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::data_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::local_data_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::cache_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::config_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::executable_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::public_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::runtime_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::template_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::font_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::home_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::audio_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::desktop_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::document_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::download_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
-    println!(
-        "{}",
-        tauri::api::path::picture_dir()
-            .unwrap_or(std::path::PathBuf::new())
-            .to_string_lossy()
-    );
+    let path = app.path();
+    for dir in [
+        path.resource_dir(),
+        path.app_config_dir(),
+        path.app_data_dir(),
+        path.app_local_data_dir(),
+        path.app_cache_dir(),
+        path.app_log_dir(),
+        path.data_dir(),
+        path.local_data_dir(),
+        path.cache_dir(),
+        path.config_dir(),
+        path.executable_dir(),
+        path.public_dir(),
+        path.runtime_dir(),
+        path.template_dir(),
+        path.font_dir(),
+        path.home_dir(),
+        path.audio_dir(),
+        path.desktop_dir(),
+        path.document_dir(),
+        path.download_dir(),
+        path.picture_dir(),
+    ] {
+        println!("{}", dir.unwrap_or_default().to_string_lossy());
+    }
 
     Ok(())
 }

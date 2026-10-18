@@ -1,10 +1,14 @@
-import { dialog, invoke } from "@tauri-apps/api";
-import { open } from "@tauri-apps/api/dialog";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { writeTextFile } from "@tauri-apps/api/fs";
 import { downloadDir } from "@tauri-apps/api/path";
+import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { useEffect, useRef, useState } from "preact/compat";
-import type { JSX } from "preact/jsx-runtime";
+import type {
+  InputEventHandler,
+  KeyboardEventHandler,
+  TargetedInputEvent,
+} from "preact";
 import "./App.css";
 import { NoteCard } from "./components/notecard";
 import { StatusBar } from "./components/status-bar";
@@ -37,7 +41,7 @@ function App() {
 
   useKeyPress(["s"], () => {
     setDebouncedValue(text);
-    void dialog.save();
+    void saveDialog();
   });
 
   useKeyPress(["t"], async () => {
@@ -72,7 +76,7 @@ function App() {
     });
   }, [debouncedValue]);
 
-  function handleOnChange(e: JSX.TargetedInputEvent<HTMLTextAreaElement>) {
+  function handleOnChange(e: TargetedInputEvent<HTMLTextAreaElement>) {
     if (!e) {
       return;
     }
@@ -80,7 +84,7 @@ function App() {
     setText(e.currentTarget?.value ?? "");
   }
 
-  const handleOnKeyDown: JSX.KeyboardEventHandler<HTMLTextAreaElement> = (
+  const handleOnKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (
     e
   ) => {
     if (e.key === "Tab") {
@@ -228,7 +232,7 @@ function App() {
         <textarea
           placeholder="⌘ + b to show history"
           onInput={
-            handleOnChange as unknown as JSX.InputEventHandler<HTMLTextAreaElement>
+            handleOnChange as unknown as InputEventHandler<HTMLTextAreaElement>
           }
           onKeyDown={handleOnKeyDown}
           id="note-text-area"

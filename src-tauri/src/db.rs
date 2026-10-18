@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use std::{fs, path};
 
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use std::env;
 
 use crate::models::{NewNote, Note, NoteMeta};
@@ -22,7 +22,7 @@ pub fn establish_connection() -> SqliteConnection {
         }
         Err(_) => {
             println!("no APP_ENV");
-            let project_dir = &tauri::api::path::home_dir().unwrap().join(".qqnote");
+            let project_dir = &dirs::home_dir().unwrap().join(".qqnote");
             fs::create_dir_all(project_dir).unwrap();
 
             let database_url = project_dir.join("app_data.db");

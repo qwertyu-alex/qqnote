@@ -2,37 +2,28 @@
   "build": {
     "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist"
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
   },
-  "package": {
-    "productName": "qqnote",
-    "version": "0.1.0"
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
   },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "shell": {
-        "all": false,
-        "open": true
-      },
-      "dialog": {
-        "all": true
-      },
-      "path": {
-        "all": true
-      },
-      "fs": {
-        "all": true,
-        "writeFile": true,
-        "readFile": true,
-        "scope": ["$DOWNLOAD/**"]
-      },
-      "clipboard": {
-        "all": true,
-        "writeText": true,
-        "readText": true
-      }
+  "productName": "qqnote",
+  "mainBinaryName": "qqnote",
+  "version": "0.1.0",
+  "identifier": "com.qqnote.app",
+  "plugins": {},
+  "app": {
+    "security": {
+      "csp": null
     },
     "windows": [
       {
@@ -40,23 +31,9 @@
         "width": 800,
         "height": 600,
         "label": "main",
-        "transparent": true
+        "transparent": true,
+        "useHttpsScheme": true
       }
-    ],
-    "security": {
-      "csp": null
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.qqnote.app",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ]
-    }
+    ]
   }
 }

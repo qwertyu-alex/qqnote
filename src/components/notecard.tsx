@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "preact/compat";
 import { IconCloseCircle } from "../icons/IconCloseCircle";
 import { getRelativeDate } from "../utils";

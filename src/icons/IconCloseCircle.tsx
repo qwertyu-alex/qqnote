@@ -1,4 +1,6 @@
-export function IconCloseCircle(props: React.JSX.SVGAttributes<SVGSVGElement>) {
+import type { SVGAttributes } from "preact";
+
+export function IconCloseCircle(props: SVGAttributes<SVGSVGElement>) {
   return (
     <svg
       viewBox="0 0 512 512"
