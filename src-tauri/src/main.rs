@@ -1,17 +1,15 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use crate::models::NoteMeta;
+use crate::models::{ExportedNote, ImportResult, NoteMeta};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use models::Note;
-use serde::Serialize;
-use std::env;
-use std::path::Path;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
-use tauri::{AppHandle, Emitter, Manager, Runtime, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, State, WindowEvent};
 
 mod db;
 mod models;
@@ -21,90 +19,145 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 
 // Define an AppState struct to hold the SQLite connection inside a Mutex
 struct AppState {
-    db: Mutex<SqliteConnection>,
+    // None if the database couldn't be opened; see `startup_error`.
+    db: Mutex<Option<SqliteConnection>>,
+    startup_error: Option<String>,
 }
 
-#[tauri::command]
-fn create_note(title: String, body: String, id: Option<i32>, state: State<'_, AppState>) -> i32 {
-    let mut conn = state.db.lock().unwrap();
-
-    let note_id = db::create_note(&mut conn, &title, &body, &id);
-    note_id
+/// A quit that is waiting for the frontend to save the open note.
+#[derive(Default)]
+struct QuitState {
+    pending: AtomicBool,
+    // Numbered so a timed-out fallback never acts on a newer request.
+    requested: AtomicU64,
+    acknowledged: AtomicU64,
 }
 
-#[tauri::command]
-fn get_notes(state: State<'_, AppState>) -> Vec<NoteMeta> {
-    let mut conn = state.db.lock().unwrap();
-
-    let result = db::get_notes(&mut conn);
-    result
+fn with_db<T>(
+    state: &State<'_, AppState>,
+    f: impl FnOnce(&mut SqliteConnection) -> QueryResult<T>,
+) -> Result<T, String> {
+    let mut db = state.db.lock().map_err(|e| e.to_string())?;
+    let conn = db.as_mut().ok_or("The database isn't available")?;
+    f(conn).map_err(|e| e.to_string())
 }
 
+/// Why the database couldn't be opened, if it couldn't. The frontend disables editing then.
 #[tauri::command]
-fn get_note_text(id: i32, state: State<'_, AppState>) -> String {
-    let mut conn = state.db.lock().unwrap();
-
-    let result = db::get_note_text(&mut conn, id);
-    result
+fn startup_error(state: State<'_, AppState>) -> Option<String> {
+    state.startup_error.clone()
 }
 
-#[tauri::command]
-fn delete_note(id: i32, state: State<'_, AppState>) -> bool {
-    let mut conn = state.db.lock().unwrap();
+// Commands run off the main thread (`async`) so large saves never stall the window.
+// The frontend sends writes one at a time, so they can't reorder.
 
-    let result = db::delete_note(&mut conn, id);
-    result
+#[tauri::command(async)]
+fn save_note(id: Option<i32>, body: String, state: State<'_, AppState>) -> Result<i32, String> {
+    with_db(&state, |conn| db::save_note(conn, id, &body))
 }
 
-#[tauri::command]
-fn export_notes(state: State<'_, AppState>) -> Vec<Note> {
-    println!("Exporting notes from database...");
-    let mut conn = state.db.lock().unwrap();
-    use crate::schema::note;
-    let notes = note::dsl::note
-        .select((note::id, note::title, note::body, note::created_at))
-        .load(&mut *conn)
-        .expect("Error loading notes for export");
-    println!("Successfully loaded {} notes for export", notes.len());
-    notes
+#[tauri::command(async)]
+fn discard_note(id: i32, state: State<'_, AppState>) -> Result<(), String> {
+    with_db(&state, |conn| db::discard_note(conn, id))
 }
 
-#[tauri::command]
-fn import_notes(json_path: String, state: State<'_, AppState>) -> Result<Vec<NoteMeta>, String> {
-    println!("Importing notes from: {}", json_path);
-    let mut conn = state.db.lock().unwrap();
+#[tauri::command(async)]
+fn get_notes(state: State<'_, AppState>) -> Result<Vec<NoteMeta>, String> {
+    with_db(&state, db::get_notes)
+}
 
-    // Read and parse the JSON file
-    let json_content =
-        std::fs::read_to_string(&json_path).map_err(|e| format!("Failed to read file: {}", e))?;
+#[tauri::command(async)]
+fn get_trash(state: State<'_, AppState>) -> Result<Vec<NoteMeta>, String> {
+    with_db(&state, db::get_trash)
+}
 
-    let notes: Vec<Note> =
-        serde_json::from_str(&json_content).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+#[tauri::command(async)]
+fn get_note_text(id: i32, state: State<'_, AppState>) -> Result<String, String> {
+    with_db(&state, |conn| db::get_note_text(conn, id))
+}
 
-    let mut imported_notes = Vec::new();
+#[tauri::command(async)]
+fn trash_note(id: i32, state: State<'_, AppState>) -> Result<(), String> {
+    with_db(&state, |conn| db::trash_note(conn, id))
+}
 
-    for note in notes {
-        // Create new note without ID to avoid conflicts
-        let new_id = db::create_note(&mut conn, &note.title, &note.body, &None);
-        if let Ok(meta) = db::get_note_meta(&mut conn, new_id) {
-            imported_notes.push(meta);
-        }
+#[tauri::command(async)]
+fn restore_note(id: i32, state: State<'_, AppState>) -> Result<(), String> {
+    with_db(&state, |conn| db::restore_note(conn, id))
+}
+
+#[tauri::command(async)]
+fn delete_forever(id: i32, state: State<'_, AppState>) -> Result<(), String> {
+    with_db(&state, |conn| db::delete_forever(conn, id))
+}
+
+#[tauri::command(async)]
+fn empty_trash(state: State<'_, AppState>) -> Result<usize, String> {
+    with_db(&state, db::empty_trash)
+}
+
+#[tauri::command(async)]
+fn export_notes(path: String, state: State<'_, AppState>) -> Result<usize, String> {
+    let notes = with_db(&state, db::export_notes)?;
+    let json = serde_json::to_string_pretty(&notes).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| format!("Failed to write {}: {}", path, e))?;
+    Ok(notes.len())
+}
+
+#[tauri::command(async)]
+fn import_notes(path: String, state: State<'_, AppState>) -> Result<ImportResult, String> {
+    let json =
+        std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path, e))?;
+    let notes: Vec<ExportedNote> =
+        serde_json::from_str(&json).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    with_db(&state, |conn| db::import_notes(conn, notes))
+}
+
+/// Asks the frontend to save the open note, then quit. Quits anyway if the frontend
+/// doesn't acknowledge within two seconds (e.g. the page is hung).
+fn request_quit<R: Runtime>(app: &AppHandle<R>) {
+    let quit = app.state::<QuitState>();
+    if quit.pending.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let request = quit.requested.fetch_add(1, Ordering::SeqCst) + 1;
+
+    if app.emit("flush-and-quit", ()).is_err() {
+        app.exit(0);
+        return;
     }
 
-    Ok(imported_notes)
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(2));
+        if app.state::<QuitState>().acknowledged.load(Ordering::SeqCst) < request {
+            app.exit(0);
+        }
+    });
+}
+
+#[tauri::command]
+fn quit_acknowledged(quit: State<'_, QuitState>) {
+    let latest = quit.requested.load(Ordering::SeqCst);
+    quit.acknowledged.store(latest, Ordering::SeqCst);
+}
+
+#[tauri::command]
+fn quit_cancelled(quit: State<'_, QuitState>) {
+    quit.pending.store(false, Ordering::SeqCst);
+}
+
+#[tauri::command]
+fn quit(app: AppHandle) {
+    app.exit(0);
 }
 
 fn main() {
-    let mut connection = db::establish_connection();
-    connection
-        .run_pending_migrations(MIGRATIONS)
-        .expect("Error migrating");
-
     println!("App started!");
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_fs::init())
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(QuitState::default())
         .setup(setup_handler)
         .menu(build_menu)
         .on_menu_event(|app, event| {
@@ -125,19 +178,46 @@ fn main() {
                     app.emit("new_note", ()).unwrap();
                     println!("New note event emitted");
                 }
+                "quit" => request_quit(app),
                 _ => {}
             }
         })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                request_quit(window.app_handle());
+            }
+        })
         .invoke_handler(tauri::generate_handler![
+            save_note,
+            discard_note,
             get_notes,
-            create_note,
+            get_trash,
             get_note_text,
-            delete_note,
+            trash_note,
+            restore_note,
+            delete_forever,
+            empty_trash,
             export_notes,
-            import_notes
+            import_notes,
+            quit_acknowledged,
+            quit_cancelled,
+            quit,
+            startup_error
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app, event| {
+        // `code` is None when the user (not `app.exit`) triggered the exit.
+        if let RunEvent::ExitRequested {
+            code: None, api, ..
+        } = event
+        {
+            api.prevent_exit();
+            request_quit(app);
+        }
+    });
 }
 
 fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -153,6 +233,11 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&import)
         .build()?;
 
+    // The native Quit item terminates the process immediately; this one saves first.
+    let quit = MenuItemBuilder::with_id("quit", "Quit qqnote")
+        .accelerator("CommandOrControl+Q")
+        .build(app)?;
+
     // Create Edit submenu with native items
     let edit_submenu = SubmenuBuilder::new(app, "Edit")
         .copy()
@@ -165,7 +250,7 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .redo()
         .maximize()
         .cut()
-        .quit()
+        .item(&quit)
         .close_window()
         .build()?;
 
@@ -176,22 +261,27 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 }
 
 fn setup_handler(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error + 'static>> {
-    let connection = db::establish_connection();
-
     let main_window = app.get_webview_window("main").unwrap();
 
-    match env::var("APP_ENV") {
-        Ok(_env) => {
-            // Create a string formatter that takes in the current title and appends "in developing" to it
-            let original_title = main_window.title().unwrap();
-            let title = format!("{} in developing", original_title);
-            main_window.set_title(&title).unwrap();
+    // If this fails, the window explains why instead of the app vanishing.
+    let (connection, startup_error) = match db::establish_connection() {
+        Ok(connection) => (Some(connection), None),
+        Err(e) => {
+            eprintln!("Couldn't open the database: {}", e);
+            (None, Some(e.to_string()))
         }
-        Err(_) => {}
+    };
+
+    if cfg!(debug_assertions) {
+        // Create a string formatter that takes in the current title and appends "in developing" to it
+        let original_title = main_window.title().unwrap();
+        let title = format!("{} in developing", original_title);
+        main_window.set_title(&title).unwrap();
     }
 
     app.manage(AppState {
         db: Mutex::new(connection), // Store the connection in the AppState, wrapped in a Mutex
+        startup_error,
     });
 
     let path = app.path();

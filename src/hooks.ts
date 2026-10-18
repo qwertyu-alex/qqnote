@@ -1,23 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "preact/hooks";
-
-export function useDebounce<T>(value: T, delay: number) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-
-  return { debouncedValue, setDebouncedValue };
-}
+import { useCallback, useEffect, useLayoutEffect, useRef } from "preact/hooks";
 
 export function useKeyPress(
   keys: string[],

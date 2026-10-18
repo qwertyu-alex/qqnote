@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 
 src-tauri/app_data.db
+# Pre-migration backups of the dev database
+src-tauri/backups/

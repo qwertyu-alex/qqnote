@@ -1,6 +1,6 @@
 import { useState, useEffect } from "preact/hooks";
 
-export function StatusBar(props: { text: string }) {
+export function StatusBar(props: { chars: number; words: number; notice: string | null }) {
   const [selectedText, setSelectedText] = useState<string>("");
   const [selectedRows, setSelectedRows] = useState<number>(0);
 
@@ -48,14 +48,15 @@ export function StatusBar(props: { text: string }) {
         msUserSelect: "none",
       }}
     >
-      <p>C: {props.text.length}</p>
-      <p>W: {props.text.split(/\s+/).length}</p>
+      <p>C: {props.chars}</p>
+      <p>W: {props.words}</p>
       {selectedText && (
         <p>
           Selected: C {selectedText.length} | {selectedRows}{" "}
           {selectedRows === 1 ? "row" : "rows"}
         </p>
       )}
+      {props.notice && <p style={{ marginLeft: "auto" }}>{props.notice}</p>}
     </div>
   );
 }

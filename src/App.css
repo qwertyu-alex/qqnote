@@ -69,8 +69,41 @@ textarea {
   gap: var(--air-padding);
   display: flex;
   flex-direction: column;
-  padding-right: var(--air-padding);
-  padding-left: var(--air-padding);
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--air-padding) var(--air-padding) 40px;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 var(--air-padding);
+}
+
+.history-empty {
+  margin: 0 var(--air-padding);
+  font-size: 0.85em;
+  color: #888;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.85em;
+  color: #555;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: #222;
+  text-decoration: underline;
+}
+
+.link-button.danger,
+.link-button.danger:hover {
+  color: #b3261e;
 }
 
 .note-card {
@@ -96,14 +129,13 @@ textarea {
   background-color: #f9f9f9; /* Slight background color change */
 }
 
-.air-element {
-  height: 100px;
-  background-color: #000000;
+.note-text {
   width: 100%;
 }
 
-.note-text {
-  width: 100%;
+.note-title.empty {
+  color: #888;
+  font-style: italic;
 }
 
 .note-title {
@@ -126,9 +158,54 @@ textarea {
   border-color: #a5a5a5a7;
 }
 
-/* Subtle effect for keydown (or click) */
-.button-pressed {
+/* Subtle effect while pressed */
+.note-card:active {
   transform: scale(0.98); /* Slightly scale down */
+}
+
+.note-card.trashed {
+  cursor: default;
+}
+
+.note-card.trashed:hover {
+  transform: none;
+}
+
+.trash-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.75em;
+}
+
+.toast {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background-color: #222222;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.toast span {
+  color: #ffffff;
+}
+
+.toast button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: #8ab4f8;
+  cursor: pointer;
 }
 
 .close-button-icon {
@@ -146,4 +223,15 @@ textarea {
 
 .note-card-container:hover .close-button-icon {
   visibility: visible;
+}
+
+.startup-error {
+  padding: 1em;
+}
+
+.startup-error-detail {
+  margin-top: 0.5em;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.85em;
+  color: #888;
 }

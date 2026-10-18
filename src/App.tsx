@@ -1,201 +1,345 @@
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { downloadDir } from "@tauri-apps/api/path";
-import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
-import { useEffect, useRef, useState } from "preact/compat";
-import type {
-  InputEventHandler,
-  KeyboardEventHandler,
-  TargetedInputEvent,
-} from "preact";
+import { downloadDir, join } from "@tauri-apps/api/path";
+import { ask, open, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import type { KeyboardEventHandler } from "preact";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/compat";
 import "./App.css";
-import { NoteCard } from "./components/notecard";
+import { NoteCard, TrashCard } from "./components/notecard";
 import { StatusBar } from "./components/status-bar";
-import { useDebounce, useKeyPress } from "./hooks";
+import { Toast, type ToastMessage } from "./components/toast";
+import { type EditorEvent, NoteEditor } from "./editor";
+import { useKeyPress } from "./hooks";
+import { api, type NoteMeta } from "./notes";
 
-type Note = {
-  id: number;
-  title: string;
-  created_at: string;
-  body: string;
-};
+const NOTICE_MS = 1500;
+const TOAST_MS = 6000;
+const QUIT_SAVE_TIMEOUT_MS = 5000;
+const UNSAVED_MESSAGE = "Couldn't save the open note, so it's still open.";
 
-function getSubstring(str: string, length: number): string {
-  // Return a substring from the start of the string to the specified length
-  return str.substring(0, length);
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
+}
+
+function today(): string {
+  const d = new Date();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
 }
 
 function App() {
-  const [id, setId] = useState<number>();
-  const [text, setText] = useState("");
-  const { debouncedValue, setDebouncedValue } = useDebounce(text, 300);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
-
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [currentId, setCurrentId] = useState<number | null>(null);
+  const [notes, setNotes] = useState<NoteMeta[]>([]);
+  const [trash, setTrash] = useState<NoteMeta[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
+  const [stats, setStats] = useState({ chars: 0, words: 0 });
+  const [notice, setNotice] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  // Editing stays off until the backend confirms the database opened.
+  const [startup, setStartup] = useState<{ ready: boolean; error: string | null }>({
+    ready: false,
+    error: null,
+  });
+
+  const showHistoryRef = useRef(showHistory);
+  showHistoryRef.current = showHistory;
+  const canEdit = useRef(false);
+  canEdit.current = startup.ready && startup.error === null;
+  const saveFailing = useRef(false);
+  const noticeTimer = useRef<number | undefined>(undefined);
+  const toastTimer = useRef<number | undefined>(undefined);
+  const statsTimer = useRef<number | undefined>(undefined);
+
+  const onEditorEvent = useRef<(event: EditorEvent) => void>(() => {});
+  const editor = useMemo(
+    () => new NoteEditor(() => textareaRef.current, (event) => onEditorEvent.current(event)),
+    []
+  );
+
+  const flashNotice = useCallback((text: string) => {
+    window.clearTimeout(noticeTimer.current);
+    setNotice(text);
+    noticeTimer.current = window.setTimeout(() => setNotice(null), NOTICE_MS);
+  }, []);
+
+  const showToast = useCallback((message: ToastMessage) => {
+    window.clearTimeout(toastTimer.current);
+    setToast(message);
+    toastTimer.current = window.setTimeout(() => setToast(null), TOAST_MS);
+  }, []);
+
+  const updateStats = useCallback(() => {
+    const text = textareaRef.current?.value ?? "";
+    setStats({ chars: text.length, words: countWords(text) });
+  }, []);
+
+  const refreshNotes = useCallback(async () => {
+    try {
+      setNotes(await api.getNotes());
+    } catch (error) {
+      console.error("Loading notes failed", error);
+    }
+  }, []);
+
+  const refreshTrash = useCallback(async () => {
+    try {
+      setTrash(await api.getTrash());
+    } catch (error) {
+      console.error("Loading the trash failed", error);
+    }
+  }, []);
+
+  onEditorEvent.current = (event) => {
+    switch (event.type) {
+      case "saved":
+        setCurrentId(event.id);
+        if (saveFailing.current) {
+          saveFailing.current = false;
+          setNotice(null);
+        }
+        if (showHistoryRef.current) {
+          void refreshNotes();
+        }
+        break;
+      case "save-failed":
+        saveFailing.current = true;
+        window.clearTimeout(noticeTimer.current);
+        setNotice("Couldn't save, retrying…");
+        break;
+      case "switched":
+        setCurrentId(event.id);
+        updateStats();
+        void refreshNotes();
+        break;
+    }
+  };
+
+  const openNote = useCallback(async (id: number) => {
+    try {
+      if (!(await editor.open(id))) {
+        showToast({ text: UNSAVED_MESSAGE });
+      }
+    } catch (error) {
+      showToast({ text: `Couldn't open the note: ${error}` });
+    }
+  }, []);
+
+  const newNote = useCallback(async () => {
+    try {
+      if (!(await editor.newNote())) {
+        showToast({ text: UNSAVED_MESSAGE });
+      }
+    } catch (error) {
+      showToast({ text: `Couldn't start a new note: ${error}` });
+    }
+  }, []);
+
+  const restoreNote = useCallback(async (id: number, reopen: boolean) => {
+    try {
+      await api.restoreNote(id);
+      if (reopen && !(await editor.open(id))) {
+        showToast({ text: UNSAVED_MESSAGE });
+      }
+    } catch (error) {
+      showToast({ text: `Couldn't restore the note: ${error}` });
+    }
+    void refreshNotes();
+    void refreshTrash();
+  }, []);
+
+  const trashNote = useCallback(async (id: number) => {
+    const wasOpen = editor.currentId === id;
+    try {
+      if (!(await editor.trash(id))) {
+        showToast({ text: "Couldn't save the note, so it wasn't deleted." });
+        return;
+      }
+    } catch (error) {
+      showToast({ text: `Couldn't delete the note: ${error}` });
+      return;
+    }
+    void refreshNotes();
+    showToast({
+      text: "Moved to Trash",
+      action: { label: "Undo", run: () => void restoreNote(id, wasOpen) },
+    });
+  }, []);
+
+  const deleteForever = useCallback(async (id: number) => {
+    const confirmed = await ask("Delete this note forever? This can't be undone.", {
+      title: "qqnote",
+      kind: "warning",
+      okLabel: "Delete",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await api.deleteForever(id);
+    } catch (error) {
+      showToast({ text: `Couldn't delete the note: ${error}` });
+    }
+    void refreshTrash();
+  }, []);
+
+  const emptyTrash = useCallback(async () => {
+    const confirmed = await ask(
+      `Delete ${trash.length === 1 ? "1 note" : `${trash.length} notes`} forever? This can't be undone.`,
+      { title: "qqnote", kind: "warning", okLabel: "Empty Trash", cancelLabel: "Cancel" }
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await api.emptyTrash();
+    } catch (error) {
+      showToast({ text: `Couldn't empty the trash: ${error}` });
+    }
+    void refreshTrash();
+  }, [trash.length]);
+
+  const handleExport = useCallback(async () => {
+    try {
+      const path = await saveDialog({
+        defaultPath: await join(await downloadDir(), `qqnote-export-${today()}.json`),
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) {
+        return;
+      }
+      await editor.flush();
+      const count = await api.exportNotes(path);
+      showToast({ text: `Exported ${count === 1 ? "1 note" : `${count} notes`}` });
+    } catch (error) {
+      showToast({ text: `Export failed: ${error}` });
+    }
+  }, []);
+
+  const handleImport = useCallback(async () => {
+    try {
+      const path = await open({ filters: [{ name: "JSON", extensions: ["json"] }] });
+      if (!path) {
+        return;
+      }
+      const { imported, skipped } = await api.importNotes(path);
+      const skippedText = skipped ? `, skipped ${skipped} empty or already here` : "";
+      showToast({ text: `Imported ${imported === 1 ? "1 note" : `${imported} notes`}${skippedText}` });
+      void refreshNotes();
+      void refreshTrash();
+    } catch (error) {
+      showToast({ text: `Import failed: ${error}` });
+    }
+  }, []);
+
+  // Sent by the backend before quitting or closing the window.
+  const flushAndQuit = useCallback(async () => {
+    await api.quitAcknowledged();
+    const timeout = new Promise<boolean>((resolve) =>
+      window.setTimeout(() => resolve(false), QUIT_SAVE_TIMEOUT_MS)
+    );
+    const saved = await Promise.race([editor.flush(), timeout]);
+    if (
+      saved ||
+      (await ask("qqnote couldn't save the open note. Quit anyway and lose the unsaved changes?", {
+        title: "qqnote",
+        kind: "warning",
+        okLabel: "Quit Anyway",
+        cancelLabel: "Cancel",
+      }))
+    ) {
+      await api.quit();
+    } else {
+      await api.quitCancelled();
+    }
+  }, []);
 
   useKeyPress(["b"], () => {
     setShowHistory((prev) => !prev);
   });
 
-  useKeyPress(["s"], () => {
-    setDebouncedValue(text);
-    void saveDialog();
+  useKeyPress(["s"], async (e) => {
+    e.preventDefault();
+    if (!canEdit.current) {
+      return;
+    }
+    if (editor.isEmptyNewNote) {
+      flashNotice("Nothing to save");
+    } else if (await editor.flush()) {
+      flashNotice("Saved");
+    }
   });
 
-  useKeyPress(["t"], async () => {
-    setId(undefined);
-    setText("");
+  useKeyPress(["t"], (e) => {
+    // File ▸ New Note has the same shortcut; handle the keypress once, here.
+    e.preventDefault();
+    if (canEdit.current) {
+      void newNote();
+    }
   });
 
-  async function save() {
-    if (text.length === 0 && !id) {
-      return;
-    }
-
-    const newId = await invoke("create_note", {
-      title: getSubstring(text, 70),
-      body: text,
-      id,
-    });
-
-    setId(newId as number);
-  }
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
-    save();
-  }, [debouncedValue]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-  useEffect(() => {
-    invoke("get_notes").then((res) => {
-      console.log(res);
-      setNotes(res as Note[]);
-    });
-  }, [debouncedValue]);
-
-  function handleOnChange(e: TargetedInputEvent<HTMLTextAreaElement>) {
-    if (!e) {
-      return;
-    }
-
-    setText(e.currentTarget?.value ?? "");
-  }
-
-  const handleOnKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (
-    e
-  ) => {
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const textarea = textareaRef.current;
-      if (!textarea) {
-        return;
-      }
-
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-
-      // Insert a tab character at the cursor position
-      const newValue = `${text.substring(0, start)}\t${text.substring(end)}`;
-      setText(newValue);
-
-      // Use setTimeout to ensure the DOM has updated
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + 1;
-      }, 0);
-      return;
-    }
-  };
-
-  async function handleNoteChange(id: number | undefined) {
-    setId(id);
-
-    if (id === undefined) {
-      setText("");
+    if (showHistory) {
+      void refreshNotes();
     } else {
-      const newText: string = await invoke("get_note_text", { id });
-      setText(newText);
+      setShowTrash(false);
     }
+  }, [showHistory]);
 
-    const notes: Note[] = await invoke("get_notes");
-    setNotes(notes);
-  }
-
-  async function handleExport() {
-    try {
-      console.log("Starting export process...");
-      console.log("Calling export_notes command...");
-      const notes = await invoke("export_notes");
-      console.log("Received notes:", notes);
-
-      const jsonString = JSON.stringify(notes, null, 2);
-      console.log("Generated JSON string");
-
-      console.log("Getting downloads directory...");
-      const downloadsPath = await downloadDir();
-      console.log("Downloads path:", downloadsPath);
-
-      const filePath = `${downloadsPath}/notes.json`;
-      console.log("Attempting to write file to:", filePath);
-
-      await writeTextFile(filePath, jsonString);
-      console.log("File written successfully!");
-    } catch (error) {
-      console.error("Error in export process:", error);
+  useEffect(() => {
+    if (showTrash) {
+      void refreshTrash();
     }
-  }
+  }, [showTrash]);
 
-  async function handleImport() {
-    try {
-      console.log("Starting import process...");
-      const selected = await open({
-        filters: [
-          {
-            name: "JSON",
-            extensions: ["json"],
-          },
-        ],
-      });
-
-      if (!selected) {
-        console.log("No file selected");
-        return;
-      }
-
-      console.log("Selected file:", selected);
-      const importedNotes = await invoke("import_notes", {
-        jsonPath: selected,
-      });
-      console.log("Notes imported successfully:", importedNotes);
-
-      // Refresh notes list
-      const notes = await invoke("get_notes");
-      setNotes(notes as Note[]);
-    } catch (error) {
-      console.error("Error in import process:", error);
-    }
-  }
+  useEffect(() => {
+    api.startupError().then(
+      (error) => setStartup({ ready: true, error }),
+      (error) => setStartup({ ready: true, error: String(error) })
+    );
+  }, []);
 
   // Add menu event listeners
   useEffect(() => {
-    console.log("Setting up menu event listeners...");
-    const unlistenExport = listen("export", (event) => {
-      console.log("Export event received:", event);
-      handleExport();
-    });
-
-    const unlistenImport = listen("import", (event) => {
-      console.log("Import event received:", event);
-      handleImport();
-    });
+    const unlisteners = [
+      listen("export", () => void handleExport()),
+      listen("import", () => void handleImport()),
+      listen("new_note", () => {
+        if (canEdit.current) {
+          void newNote();
+        }
+      }),
+      listen("flush-and-quit", () => void flushAndQuit()),
+    ];
+    // Leaving the window (another app, the Dock, logging out) saves right away.
+    const onBlur = () => void editor.flush();
+    window.addEventListener("blur", onBlur);
 
     return () => {
-      unlistenExport.then((fn) => fn());
-      unlistenImport.then((fn) => fn());
+      for (const unlisten of unlisteners) {
+        void unlisten.then((fn) => fn());
+      }
+      window.removeEventListener("blur", onBlur);
     };
   }, []);
+
+  function handleInput() {
+    editor.edited();
+    window.clearTimeout(statsTimer.current);
+    statsTimer.current = window.setTimeout(updateStats, 150);
+  }
+
+  const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+    if (e.key === "Tab" && !e.isComposing) {
+      e.preventDefault();
+      // Inserting through the browser's editing pipeline keeps it undoable, like typing.
+      // Assigning textarea.value directly would wipe the undo history.
+      document.execCommand("insertText", false, "\t");
+    }
+  };
 
   return (
     <div
@@ -229,56 +373,93 @@ function App() {
           paddingBottom: "10px",
         }}
       >
-        <textarea
-          placeholder="⌘ + b to show history"
-          onInput={
-            handleOnChange as unknown as InputEventHandler<HTMLTextAreaElement>
-          }
-          onKeyDown={handleOnKeyDown}
-          id="note-text-area"
-          autoComplete={"off"}
-          // biome-ignore lint/a11y/noAutofocus: <explanation>
-          autoFocus={true}
-          value={text}
-          style={{
-            fontSize: "1em",
-            minHeight: "100vh",
-            width: "100%",
-            margin: "0px",
-            padding: "1em",
-            outline: "none",
-            border: "none",
-            resize: "none",
-            boxSizing: "border-box",
-            backgroundColor: "transparent",
-            borderRadius: "var(--border-radius)",
-          }}
-          ref={textareaRef}
-        />
-        <StatusBar text={text} />
+        {startup.error ? (
+          <div class="startup-error">
+            <p>qqnote couldn't open its database, so editing is turned off to keep your notes safe.</p>
+            <p class="startup-error-detail">{startup.error}</p>
+          </div>
+        ) : (
+          <textarea
+            placeholder="⌘ + b to show history"
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            id="note-text-area"
+            autoComplete={"off"}
+            // Plain text only: no spelling underlines, and macOS doesn't rewrite quotes,
+            // dashes or words as you type.
+            spellcheck={false}
+            autocorrect="off"
+            autocapitalize="off"
+            // biome-ignore lint/a11y/noAutofocus: <explanation>
+            autoFocus={true}
+            readOnly={!startup.ready}
+            style={{
+              fontSize: "1em",
+              minHeight: "100vh",
+              width: "100%",
+              margin: "0px",
+              padding: "1em",
+              outline: "none",
+              border: "none",
+              resize: "none",
+              boxSizing: "border-box",
+              backgroundColor: "transparent",
+              borderRadius: "var(--border-radius)",
+            }}
+            ref={textareaRef}
+          />
+        )}
+        <StatusBar chars={stats.chars} words={stats.words} notice={notice} />
       </div>
       {showHistory && (
         <div id="history-container">
           <div id="history-content-container">
-            <div class="air-element" />
-            <div class="air-element" />
-            {notes.map((n) => (
-              <NoteCard
-                key={n.id}
-                id={n.id}
-                title={n.title}
-                created_at={n.created_at}
-                handleNoteChange={handleNoteChange}
-                selected={id === n.id}
-              />
-            ))}
-            <div class="air-element" />
-            <div class="air-element" />
-            <div class="air-element" />
-            <div class="air-element" />
+            <div class="history-header">
+              {showTrash ? (
+                <>
+                  <button type="button" class="link-button" onClick={() => setShowTrash(false)}>
+                    ← Notes
+                  </button>
+                  {trash.length > 0 && (
+                    <button type="button" class="link-button danger" onClick={emptyTrash}>
+                      Empty Trash
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button type="button" class="link-button" onClick={() => setShowTrash(true)}>
+                  Trash
+                </button>
+              )}
+            </div>
+            {showTrash ? (
+              trash.length === 0 ? (
+                <p class="history-empty">Trash is empty</p>
+              ) : (
+                trash.map((n) => (
+                  <TrashCard
+                    key={n.id}
+                    note={n}
+                    onRestore={(id) => void restoreNote(id, false)}
+                    onDelete={deleteForever}
+                  />
+                ))
+              )
+            ) : (
+              notes.map((n) => (
+                <NoteCard
+                  key={n.id}
+                  note={n}
+                  selected={currentId === n.id}
+                  onOpen={openNote}
+                  onTrash={trashNote}
+                />
+              ))
+            )}
           </div>
         </div>
       )}
+      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }
