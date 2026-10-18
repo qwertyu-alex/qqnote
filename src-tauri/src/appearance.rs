@@ -1,12 +1,13 @@
 //! View ▸ Appearance: follow the system, or always use light or dark.
 //!
 //! The choice applies to the whole app, so the title bar and dialogs switch along with the
-//! page (whose CSS follows `prefers-color-scheme`). It's saved in ~/.qqnote/settings.json.
+//! page (whose CSS follows `prefers-color-scheme`), and so does the Dock icon. It's saved in
+//! ~/.qqnote/settings.json.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::menu::{CheckMenuItem, CheckMenuItemBuilder, Submenu, SubmenuBuilder};
-use tauri::{AppHandle, Runtime, Theme};
+use tauri::{AppHandle, Manager, Runtime, Theme};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
@@ -79,12 +80,51 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) {
 
 pub fn select<R: Runtime>(app: &AppHandle<R>, appearance: Appearance) {
     app.set_theme(appearance.theme());
+    update_dock_icon(app);
     // Clicking only flipped the clicked item's checkmark.
     sync_menu(app, appearance);
     if let Err(e) = save(&Settings { appearance }) {
         eprintln!("Couldn't save the appearance: {}", e);
     }
 }
+
+/// Shows the dark Dock icon while qqnote is dark, and the bundle's own icon otherwise.
+///
+/// Call after the appearance changes: on launch, when the Mac switches, and from the menu.
+/// It only lasts while qqnote runs; Finder and a closed app's Dock icon stay light.
+#[cfg(target_os = "macos")]
+pub fn update_dock_icon<R: Runtime>(app: &AppHandle<R>) {
+    use objc2::{AllocAnyThread, MainThreadMarker};
+    use objc2_app_kit::{NSApplication, NSImage};
+    use objc2_foundation::NSData;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    static SHOWING_DARK: AtomicBool = AtomicBool::new(false);
+
+    let Some(mtm) = MainThreadMarker::new() else {
+        return;
+    };
+    // The window's theme is the app's: the menu's choice, or the Mac's when following it.
+    let dark = app
+        .get_webview_window("main")
+        .and_then(|window| window.theme().ok())
+        == Some(Theme::Dark);
+    // Leaves the icon alone until it has to change, so dev builds keep Tauri's dev icon.
+    if SHOWING_DARK.swap(dark, Ordering::SeqCst) == dark {
+        return;
+    }
+    let icon = dark
+        .then(|| {
+            let data = NSData::with_bytes(include_bytes!("../icons/icon-dark.png"));
+            NSImage::initWithData(NSImage::alloc(), &data)
+        })
+        .flatten();
+    // nil puts the bundle's icon back.
+    unsafe { NSApplication::sharedApplication(mtm).setApplicationIconImage(icon.as_deref()) };
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn update_dock_icon<R: Runtime>(_app: &AppHandle<R>) {}
 
 fn sync_menu<R: Runtime>(app: &AppHandle<R>, selected: Appearance) {
     let submenu = app

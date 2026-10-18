@@ -201,6 +201,10 @@ fn main() {
                 api.prevent_close();
                 let _ = window.hide();
             }
+            // The Mac switched between light and dark (only matters while following it).
+            if let WindowEvent::ThemeChanged(_) = event {
+                appearance::update_dock_icon(window.app_handle());
+            }
         })
         .invoke_handler(tauri::generate_handler![
             save_note,
@@ -236,6 +240,8 @@ fn main() {
             has_visible_windows: false,
             ..
         } => launcher::show(app),
+        // After Tauri sets its own Dock icon in dev builds.
+        RunEvent::Ready => appearance::update_dock_icon(app),
         RunEvent::Exit => launcher::teardown(),
         _ => {}
     });
