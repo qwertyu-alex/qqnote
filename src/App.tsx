@@ -348,7 +348,7 @@ function App() {
         border: "none",
         outline: "none",
         display: "flex",
-        overflow: "none",
+        overflow: "hidden",
         flex: 1,
         height: "100%",
       }}
@@ -368,9 +368,9 @@ function App() {
       <div
         style={{
           flex: 1,
-          overflow: "visible",
-          display: "relative",
-          paddingBottom: "10px",
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         {startup.error ? (
@@ -395,7 +395,9 @@ function App() {
             readOnly={!startup.ready}
             style={{
               fontSize: "1em",
-              minHeight: "100vh",
+              flex: 1,
+              minHeight: 0,
+              overscrollBehavior: "contain",
               width: "100%",
               margin: "0px",
               padding: "1em",

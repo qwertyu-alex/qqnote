@@ -15,6 +15,9 @@ body,
 #root {
   margin: 0;
   height: 100%;
+  /* The window never scrolls or rubber-bands; only the text and the history list do. */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -53,9 +56,9 @@ textarea {
 
 #history-container {
   user-select: none;
-  height: 100svh;
-  max-height: 100svh;
+  height: 100%;
   overflow-y: scroll;
+  overscroll-behavior: contain;
   overflow-x: hidden;
   display: flex;
   min-width: none;
@@ -178,8 +181,8 @@ textarea {
 }
 
 .toast {
-  position: absolute;
-  bottom: 30px;
+  position: fixed;
+  bottom: 32px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 10000;
@@ -226,7 +229,19 @@ textarea {
 }
 
 .startup-error {
+  flex: 1;
   padding: 1em;
+}
+
+.status-bar {
+  flex: none;
+  display: flex;
+  gap: 10px;
+  height: 20px;
+  padding: 0 10px;
+  font-size: 12px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .startup-error-detail {
