@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="public/qq.svg" alt="logo" width="200" height="auto" />
+  <img src="public/qq.png" alt="qqnote logo" width="200" height="auto" />
   <h1>qqnote</h1>
   
   <p>
