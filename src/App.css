@@ -2,12 +2,61 @@
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-  color: #222222;
+  color: var(--text);
 }
 
 :root {
+  /* Native parts (scrollbars, the caret, dialogs) follow the system appearance too. */
+  color-scheme: light dark;
   --air-padding: 10px;
   --background-color: rgba(255, 255, 255, 0.5);
+  --grain-rgb: 0, 0, 0;
+  --text: #222222;
+  --text-secondary: #555;
+  --text-muted: #888;
+  --danger: #b3261e;
+  --card-background: var(--background-color);
+  --card-hover-background: #f9f9f9;
+  --card-border: #d6d6d6a7;
+  --card-selected-border: #a5a5a5a7;
+  --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --card-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+  --card-selected-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  --toast-background: #222222;
+  --toast-text: #ffffff;
+  --status-background: #f6f6f6;
+  --status-border: rgba(0, 0, 0, 0.08);
+  --status-text: #6e6e73;
+  --status-separator: rgba(0, 0, 0, 0.14);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Opaque: the webview doesn't draw a background, so a translucent one shows the window's. */
+    --background-color: #1e1e1e;
+    --grain-rgb: 255, 255, 255;
+    --text: #e0e0e0;
+    --text-secondary: #a8a8a8;
+    --text-muted: #8e8e93;
+    --danger: #ff6961;
+    --card-background: #262626;
+    --card-hover-background: #2c2c2c;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --card-selected-border: rgba(255, 255, 255, 0.28);
+    --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --card-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    --card-selected-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    --toast-background: #3a3a3c;
+    --toast-text: #f2f2f2;
+    --status-background: #252525;
+    --status-border: rgba(255, 255, 255, 0.08);
+    --status-text: #98989d;
+    --status-separator: rgba(255, 255, 255, 0.14);
+  }
+
+  textarea::placeholder {
+    color: #6e6e73;
+  }
 }
 
 html,
@@ -21,15 +70,15 @@ body,
 }
 
 body {
-  background-color: var(--background-color); /* White background */
+  background-color: var(--background-color);
   background-image: radial-gradient(
       circle,
-      rgba(0, 0, 0, 0.05) 1%,
+      rgba(var(--grain-rgb), 0.05) 1%,
       transparent 1%
     ),
-    radial-gradient(circle, rgba(0, 0, 0, 0.04) 1%, transparent 1%),
-    radial-gradient(circle, rgba(0, 0, 0, 0.03) 1%, transparent 1%),
-    radial-gradient(circle, rgba(0, 0, 0, 0.02) 1%, transparent 1%);
+    radial-gradient(circle, rgba(var(--grain-rgb), 0.04) 1%, transparent 1%),
+    radial-gradient(circle, rgba(var(--grain-rgb), 0.03) 1%, transparent 1%),
+    radial-gradient(circle, rgba(var(--grain-rgb), 0.02) 1%, transparent 1%);
 
   /* Different background sizes for randomness */
   background-size: 4px 4px, /* First layer: Slightly larger grains */ 3px 3px,
@@ -86,7 +135,7 @@ textarea {
 .history-empty {
   margin: 0 var(--air-padding);
   font-size: 0.85em;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .link-button {
@@ -95,27 +144,27 @@ textarea {
   padding: 0;
   font: inherit;
   font-size: 0.85em;
-  color: #555;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
 .link-button:hover {
-  color: #222;
+  color: var(--text);
   text-decoration: underline;
 }
 
 .link-button.danger,
 .link-button.danger:hover {
-  color: #b3261e;
+  color: var(--danger);
 }
 
 .note-card {
-  border-color: #d6d6d6a7;
+  border-color: var(--card-border);
   border-width: 1px;
   border-style: solid;
   border-radius: 3px; /* Smooth corners for a modern look */
   padding: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  box-shadow: var(--card-shadow); /* Subtle shadow for depth */
   transition: transform 0.2s ease, box-shadow 0.2s ease; /* Animation for interaction */
   cursor: pointer;
   overflow: hidden;
@@ -123,13 +172,13 @@ textarea {
   margin-right: var(--air-padding);
   position: relative;
 
-  background-color: var(--background-color); /* White background */
+  background-color: var(--card-background);
 }
 
 .note-card:hover {
   transform: translateY(-3px); /* Slight lift */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12); /* Slightly stronger shadow */
-  background-color: #f9f9f9; /* Slight background color change */
+  box-shadow: var(--card-hover-shadow); /* Slightly stronger shadow */
+  background-color: var(--card-hover-background); /* Slight background color change */
 }
 
 .note-text {
@@ -137,7 +186,7 @@ textarea {
 }
 
 .note-title.empty {
-  color: #888;
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -151,14 +200,14 @@ textarea {
 
 .note-created-at {
   font-size: 0.8em;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .note-card.selected {
   /* transform: scale(1.03); */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Additional shadow for depth */
+  box-shadow: var(--card-selected-shadow); /* Additional shadow for depth */
   font-weight: 600;
-  border-color: #a5a5a5a7;
+  border-color: var(--card-selected-border);
 }
 
 /* Subtle effect while pressed */
@@ -191,14 +240,14 @@ textarea {
   gap: 12px;
   padding: 6px 12px;
   border-radius: 6px;
-  background-color: #222222;
+  background-color: var(--toast-background);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   font-size: 13px;
   white-space: nowrap;
 }
 
 .toast span {
-  color: #ffffff;
+  color: var(--toast-text);
 }
 
 .toast button {
@@ -239,8 +288,8 @@ textarea {
   align-items: center;
   height: 26px;
   padding: 0 14px;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-  background-color: #f6f6f6;
+  border-top: 1px solid var(--status-border);
+  background-color: var(--status-background);
   font-size: 11.5px;
   cursor: default;
   user-select: none;
@@ -248,7 +297,7 @@ textarea {
 }
 
 .status-bar span {
-  color: #6e6e73;
+  color: var(--status-text);
   white-space: nowrap;
   /* Digits keep their width, so the bar doesn't jiggle while counts change. */
   font-variant-numeric: tabular-nums;
@@ -258,7 +307,7 @@ textarea {
   width: 1px;
   height: 12px;
   margin: 0 10px;
-  background-color: rgba(0, 0, 0, 0.14);
+  background-color: var(--status-separator);
 }
 
 .status-bar .status-end {
@@ -266,12 +315,12 @@ textarea {
 }
 
 .status-bar .status-end.error {
-  color: #b3261e;
+  color: var(--danger);
 }
 
 .startup-error-detail {
   margin-top: 0.5em;
   font-family: ui-monospace, Menlo, monospace;
   font-size: 0.85em;
-  color: #888;
+  color: var(--text-muted);
 }
