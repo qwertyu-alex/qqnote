@@ -49,3 +49,24 @@ export function getRelativeDate(ddate: Date, cutOffDays: number): string {
   const day = String(ddate.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+/** Counts characters the way people do: an emoji is one character, not two UTF-16 units. */
+export function countCharacters(text: string): number {
+  return text.length - (text.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g)?.length ?? 0);
+}
+
+export function countWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
+}
+
+/** 1-based line and column of a position in the text. */
+export function caretPosition(text: string, offset: number): { line: number; col: number } {
+  let line = 1;
+  let lineStart = 0;
+  for (let i = text.indexOf("\n"); i !== -1 && i < offset; i = text.indexOf("\n", i + 1)) {
+    line++;
+    lineStart = i + 1;
+  }
+  return { line, col: countCharacters(text.slice(lineStart, offset)) + 1 };
+}

@@ -236,12 +236,37 @@ textarea {
 .status-bar {
   flex: none;
   display: flex;
-  gap: 10px;
-  height: 20px;
-  padding: 0 10px;
-  font-size: 12px;
+  align-items: center;
+  height: 26px;
+  padding: 0 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background-color: #f6f6f6;
+  font-size: 11.5px;
+  cursor: default;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.status-bar span {
+  color: #6e6e73;
+  white-space: nowrap;
+  /* Digits keep their width, so the bar doesn't jiggle while counts change. */
+  font-variant-numeric: tabular-nums;
+}
+
+.status-bar .status-separator {
+  width: 1px;
+  height: 12px;
+  margin: 0 10px;
+  background-color: rgba(0, 0, 0, 0.14);
+}
+
+.status-bar .status-end {
+  margin-left: auto;
+}
+
+.status-bar .status-end.error {
+  color: #b3261e;
 }
 
 .startup-error-detail {

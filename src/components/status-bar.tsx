@@ -1,43 +1,76 @@
-import { useState, useEffect } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
+import { caretPosition, countCharacters, countWords } from "../utils";
 
-export function StatusBar(props: { chars: number; words: number; notice: string | null }) {
-  const [selectedText, setSelectedText] = useState<string>("");
-  const [selectedRows, setSelectedRows] = useState<number>(0);
+const numberFormat = new Intl.NumberFormat();
+
+function count(n: number, noun: string): string {
+  return `${numberFormat.format(n)} ${noun}${n === 1 ? "" : "s"}`;
+}
+
+type Caret = { line: number; col: number; selectedWords: number; selectedChars: number } | null;
+
+export function StatusBar(props: {
+  textarea: () => HTMLTextAreaElement | null;
+  chars: number;
+  words: number;
+  status: string | null;
+  error: boolean;
+}) {
+  const [caret, setCaret] = useState<Caret>(null);
 
   useEffect(() => {
-    const handleSelectionChange = () => {
-      const selection = window.getSelection();
-      if (selection && selection.toString()) {
-        // Get selected text
-        const text = selection.toString();
-        setSelectedText(text);
-
-        // Count number of rows in selection
-        const rowCount = text.split("\n").length;
-        setSelectedRows(rowCount);
-      } else {
-        setSelectedText("");
-        setSelectedRows(0);
+    let timer: number | undefined;
+    const update = () => {
+      timer = undefined;
+      const textarea = props.textarea();
+      if (!textarea) {
+        return;
       }
+      const { selectionStart: start, selectionEnd: end, selectionDirection, value } = textarea;
+      const { line, col } = caretPosition(value, selectionDirection === "backward" ? start : end);
+      const selected = start === end ? "" : value.slice(start, end);
+      setCaret({
+        line,
+        col,
+        selectedWords: countWords(selected),
+        selectedChars: countCharacters(selected),
+      });
+    };
+    // Fires for typing, arrow keys, clicks and note switches; coalesce bursts into one update.
+    const schedule = () => {
+      timer ??= window.setTimeout(update, 0);
     };
 
-    document.addEventListener("selectionchange", handleSelectionChange);
+    update();
+    document.addEventListener("selectionchange", schedule);
     return () => {
-      document.removeEventListener("selectionchange", handleSelectionChange);
+      document.removeEventListener("selectionchange", schedule);
+      window.clearTimeout(timer);
     };
   }, []);
 
+  const selecting = caret !== null && caret.selectedChars > 0;
+
   return (
     <div class="status-bar">
-      <p>C: {props.chars}</p>
-      <p>W: {props.words}</p>
-      {selectedText && (
-        <p>
-          Selected: C {selectedText.length} | {selectedRows}{" "}
-          {selectedRows === 1 ? "row" : "rows"}
-        </p>
+      <span>
+        Ln {caret?.line ?? 1}, Col {caret?.col ?? 1}
+      </span>
+      <span class="status-separator" />
+      <span>
+        {selecting
+          ? `${numberFormat.format(caret.selectedWords)} of ${count(props.words, "word")}`
+          : count(props.words, "word")}
+      </span>
+      <span class="status-separator" />
+      <span>
+        {selecting
+          ? `${numberFormat.format(caret.selectedChars)} of ${count(props.chars, "character")}`
+          : count(props.chars, "character")}
+      </span>
+      {props.status && (
+        <span class={`status-end${props.error ? " error" : ""}`}>{props.status}</span>
       )}
-      {props.notice && <p style={{ marginLeft: "auto" }}>{props.notice}</p>}
     </div>
   );
 }

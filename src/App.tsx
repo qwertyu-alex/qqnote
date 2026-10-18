@@ -10,16 +10,12 @@ import { Toast, type ToastMessage } from "./components/toast";
 import { type EditorEvent, NoteEditor } from "./editor";
 import { useKeyPress } from "./hooks";
 import { api, type NoteMeta } from "./notes";
+import { countCharacters, countWords } from "./utils";
 
 const NOTICE_MS = 1500;
 const TOAST_MS = 6000;
 const QUIT_SAVE_TIMEOUT_MS = 5000;
 const UNSAVED_MESSAGE = "Couldn't save the open note, so it's still open.";
-
-function countWords(text: string): number {
-  const trimmed = text.trim();
-  return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
-}
 
 function today(): string {
   const d = new Date();
@@ -36,7 +32,9 @@ function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
   const [stats, setStats] = useState({ chars: 0, words: 0 });
+  // A short-lived message (⌘S) shown instead of the save state.
   const [notice, setNotice] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<"saved" | "edited" | "failed">("saved");
   const [toast, setToast] = useState<ToastMessage | null>(null);
   // Editing stays off until the backend confirms the database opened.
   const [startup, setStartup] = useState<{ ready: boolean; error: string | null }>({
@@ -48,7 +46,6 @@ function App() {
   showHistoryRef.current = showHistory;
   const canEdit = useRef(false);
   canEdit.current = startup.ready && startup.error === null;
-  const saveFailing = useRef(false);
   const noticeTimer = useRef<number | undefined>(undefined);
   const toastTimer = useRef<number | undefined>(undefined);
   const statsTimer = useRef<number | undefined>(undefined);
@@ -73,7 +70,7 @@ function App() {
 
   const updateStats = useCallback(() => {
     const text = textareaRef.current?.value ?? "";
-    setStats({ chars: text.length, words: countWords(text) });
+    setStats({ chars: countCharacters(text), words: countWords(text) });
   }, []);
 
   const refreshNotes = useCallback(async () => {
@@ -94,23 +91,23 @@ function App() {
 
   onEditorEvent.current = (event) => {
     switch (event.type) {
+      case "edited":
+        // A failure stays visible until a save actually succeeds.
+        setSaveState((state) => (state === "failed" ? state : "edited"));
+        break;
       case "saved":
         setCurrentId(event.id);
-        if (saveFailing.current) {
-          saveFailing.current = false;
-          setNotice(null);
-        }
+        setSaveState(editor.hasUnsavedChanges ? "edited" : "saved");
         if (showHistoryRef.current) {
           void refreshNotes();
         }
         break;
       case "save-failed":
-        saveFailing.current = true;
-        window.clearTimeout(noticeTimer.current);
-        setNotice("Couldn't save, retrying…");
+        setSaveState("failed");
         break;
       case "switched":
         setCurrentId(event.id);
+        setSaveState("saved");
         updateStats();
         void refreshNotes();
         break;
@@ -269,7 +266,7 @@ function App() {
     if (editor.isEmptyNewNote) {
       flashNotice("Nothing to save");
     } else if (await editor.flush()) {
-      flashNotice("Saved");
+      flashNotice("Saved ✓");
     }
   });
 
@@ -330,6 +327,18 @@ function App() {
     editor.edited();
     window.clearTimeout(statsTimer.current);
     statsTimer.current = window.setTimeout(updateStats, 150);
+  }
+
+  const getTextarea = useCallback(() => textareaRef.current, []);
+
+  // Right side of the status bar. Nothing for a blank new note: there's nothing to save.
+  let status: string | null = null;
+  if (notice) {
+    status = notice;
+  } else if (saveState === "failed") {
+    status = "Couldn't save, retrying…";
+  } else if (canEdit.current && !editor.isEmptyNewNote) {
+    status = saveState === "edited" ? "Edited" : "Saved";
   }
 
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
@@ -411,7 +420,13 @@ function App() {
             ref={textareaRef}
           />
         )}
-        <StatusBar chars={stats.chars} words={stats.words} notice={notice} />
+        <StatusBar
+          textarea={getTextarea}
+          chars={stats.chars}
+          words={stats.words}
+          status={status}
+          error={notice === null && saveState === "failed"}
+        />
       </div>
       {showHistory && (
         <div id="history-container">

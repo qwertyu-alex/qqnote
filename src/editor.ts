@@ -22,6 +22,8 @@ function newSession(): Session {
 }
 
 export type EditorEvent =
+  // The first edit since the last save.
+  | { type: "edited" }
   | { type: "saved"; id: number | null }
   | { type: "save-failed"; error: string }
   | { type: "switched"; id: number | null };
@@ -48,6 +50,12 @@ export class NoteEditor {
     return this.session.id;
   }
 
+  /** True while there is text that hasn't been saved yet. */
+  get hasUnsavedChanges(): boolean {
+    const textarea = this.textarea();
+    return this.timer !== undefined || (textarea !== null && textarea.value !== this.session.saved);
+  }
+
   /** True for a note created here that has no text, i.e. there is nothing to save. */
   get isEmptyNewNote(): boolean {
     return this.session.isNew && this.textarea()?.value === "";
@@ -56,7 +64,10 @@ export class NoteEditor {
   /** Call after every edit. */
   edited(): void {
     const now = Date.now();
-    this.firstUnsavedEdit ??= now;
+    if (this.firstUnsavedEdit === undefined) {
+      this.firstUnsavedEdit = now;
+      this.onEvent({ type: "edited" });
+    }
     window.clearTimeout(this.timer);
     if (now - this.firstUnsavedEdit >= MAX_SAVE_DELAY_MS) {
       void this.flush();
