@@ -8,11 +8,12 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{CheckMenuItemBuilder, Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, State, WindowEvent};
 
 mod appearance;
 mod db;
+mod launcher;
 mod models;
 mod schema;
 
@@ -158,6 +159,12 @@ fn main() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .arg(launcher::BACKGROUND_ARG)
+                .build(),
+        )
         .manage(QuitState::default())
         .setup(setup_handler)
         .menu(build_menu)
@@ -179,6 +186,7 @@ fn main() {
                     app.emit("new_note", ()).unwrap();
                     println!("New note event emitted");
                 }
+                "open_at_login" => launcher::toggle_open_at_login(app),
                 "quit" => request_quit(app),
                 id => {
                     if let Some(appearance) = appearance::Appearance::from_menu_id(id) {
@@ -188,9 +196,10 @@ fn main() {
             }
         })
         .on_window_event(|window, event| {
+            // Closing only hides the window, so Caps Lock can bring it back. ⌘Q quits.
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                request_quit(window.app_handle());
+                let _ = window.hide();
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -213,15 +222,22 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|app, event| {
+    app.run(|app, event| match event {
         // `code` is None when the user (not `app.exit`) triggered the exit.
-        if let RunEvent::ExitRequested {
+        RunEvent::ExitRequested {
             code: None, api, ..
-        } = event
-        {
+        } => {
             api.prevent_exit();
             request_quit(app);
         }
+        // Clicking the Dock icon while the window is closed.
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen {
+            has_visible_windows: false,
+            ..
+        } => launcher::show(app),
+        RunEvent::Exit => launcher::teardown(),
+        _ => {}
     });
 }
 
@@ -232,10 +248,15 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build(app)?;
     let export = MenuItemBuilder::with_id("export", "Export Notes").build(app)?;
     let import = MenuItemBuilder::with_id("import", "Import Notes").build(app)?;
-    let file_submenu = SubmenuBuilder::new(app, "File")
+    // Checked in `launcher::setup`, once the autostart plugin can say if it's on.
+    let open_at_login =
+        CheckMenuItemBuilder::with_id("open_at_login", "Open at Login").build(app)?;
+    let file_submenu = SubmenuBuilder::with_id(app, "file", "File")
         .item(&new_note)
         .item(&export)
         .item(&import)
+        .separator()
+        .item(&open_at_login)
         .build()?;
 
     // The native Quit item terminates the process immediately; this one saves first.
@@ -318,6 +339,7 @@ fn setup_handler(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error +
     }
 
     appearance::setup(app.handle());
+    launcher::setup(app.handle());
 
     Ok(())
 }
