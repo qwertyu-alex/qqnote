@@ -11,6 +11,7 @@ use std::time::Duration;
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, State, WindowEvent};
 
+mod appearance;
 mod db;
 mod models;
 mod schema;
@@ -179,7 +180,11 @@ fn main() {
                     println!("New note event emitted");
                 }
                 "quit" => request_quit(app),
-                _ => {}
+                id => {
+                    if let Some(appearance) = appearance::Appearance::from_menu_id(id) {
+                        appearance::select(app, appearance);
+                    }
+                }
             }
         })
         .on_window_event(|window, event| {
@@ -257,6 +262,7 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     MenuBuilder::new(app)
         .item(&file_submenu)
         .item(&edit_submenu)
+        .item(&appearance::view_submenu(app)?)
         .build()
 }
 
@@ -310,6 +316,8 @@ fn setup_handler(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error +
     ] {
         println!("{}", dir.unwrap_or_default().to_string_lossy());
     }
+
+    appearance::setup(app.handle());
 
     Ok(())
 }
