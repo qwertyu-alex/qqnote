@@ -8,7 +8,9 @@
 :root {
   /* Native parts (scrollbars, the caret, dialogs) follow the system appearance too. */
   color-scheme: light dark;
-  --background-color: rgba(255, 255, 255, 0.5);
+  /* Opaque: the webview doesn't draw a background, so a translucent one would show the
+     window's, which is the title bar's gray (see appearance.rs). */
+  --background-color: #ffffff;
   --grain-rgb: 0, 0, 0;
   --text: #222222;
   --text-secondary: #555;
@@ -20,6 +22,7 @@
   --sidebar-background: #f5f5f4;
   --sidebar-border: rgba(0, 0, 0, 0.08);
   --row-hover: rgba(0, 0, 0, 0.045);
+  --title-bar-border: rgba(0, 0, 0, 0.1);
   --toast-background: #222222;
   --toast-text: #ffffff;
   --status-background: #f6f6f6;
@@ -30,7 +33,6 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Opaque: the webview doesn't draw a background, so a translucent one shows the window's. */
     --background-color: #1e1e1e;
     --grain-rgb: 255, 255, 255;
     --text: #e0e0e0;
@@ -43,6 +45,7 @@
     --sidebar-background: #262626;
     --sidebar-border: rgba(255, 255, 255, 0.08);
     --row-hover: rgba(255, 255, 255, 0.055);
+    --title-bar-border: rgba(0, 0, 0, 0.55);
     --toast-background: #3a3a3c;
     --toast-text: #f2f2f2;
     --status-background: #252525;
@@ -92,6 +95,19 @@ body {
 
   /* Slightly offset each layer for more natural randomness */
   background-position: 0 0, 1px 2px, 2px 1px, -1px -2px;
+}
+
+/* The line under the title bar, along the top of the page. */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  height: 1px;
+  background-color: var(--title-bar-border);
+  pointer-events: none;
 }
 
 textarea {

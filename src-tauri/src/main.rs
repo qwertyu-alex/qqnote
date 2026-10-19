@@ -235,6 +235,7 @@ fn main() {
             }
             // The Mac switched between light and dark (only matters while following it).
             if let WindowEvent::ThemeChanged(_) = event {
+                appearance::update_title_bar(window.app_handle());
                 appearance::update_dock_icon(window.app_handle());
             }
         })

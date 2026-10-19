@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::menu::{CheckMenuItem, CheckMenuItemBuilder, Submenu, SubmenuBuilder};
+use tauri::window::Color;
 use tauri::{AppHandle, Manager, Runtime, Theme};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -75,17 +76,36 @@ pub fn view_submenu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Submenu<R>>
 pub fn setup<R: Runtime>(app: &AppHandle<R>) {
     let appearance = load().appearance;
     app.set_theme(appearance.theme());
+    update_title_bar(app);
     sync_menu(app, appearance);
 }
 
 pub fn select<R: Runtime>(app: &AppHandle<R>, appearance: Appearance) {
     app.set_theme(appearance.theme());
+    update_title_bar(app);
     update_dock_icon(app);
     // Clicking only flipped the clicked item's checkmark.
     sync_menu(app, appearance);
     if let Err(e) = save(&Settings { appearance }) {
         eprintln!("Couldn't save the appearance: {}", e);
     }
+}
+
+/// Gives the title bar a gray that sets it apart from the page; the page draws the line under
+/// it. The title bar is transparent (`titleBarStyle` in tauri.conf.json), so it shows the
+/// window's background color.
+///
+/// Call after the appearance changes: on launch, when the Mac switches, and from the menu.
+pub fn update_title_bar<R: Runtime>(app: &AppHandle<R>) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let color = match window.theme() {
+        Ok(Theme::Dark) => Color(0x2b, 0x2b, 0x2b, 0xff),
+        _ => Color(0xf6, 0xf6, 0xf6, 0xff),
+    };
+    // Only the window's: the page paints its own background.
+    let _ = window.as_ref().window().set_background_color(Some(color));
 }
 
 /// Shows the dark Dock icon while qqnote is dark, and the bundle's own icon otherwise.
