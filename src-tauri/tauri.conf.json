@@ -20,7 +20,15 @@
   "mainBinaryName": "qqnote",
   "version": "0.1.0",
   "identifier": "com.qqnote.app",
-  "plugins": {},
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI1NUQ0NzRFQTc2Q0M5OUMKUldTY3lXeW5Ua2RkSmNJZWdoREo1OGM5bXhreVcyR1FFa1EwRld1NERQeThFS3pMcEFEVnN3N28K",
+      "endpoints": [
+        "https://github.com/qwertyu-alex/qqnote/releases/latest/download/latest.json"
+      ],
+      "requireSignedVersion": true
+    }
+  },
   "app": {
     "security": {
       "csp": null

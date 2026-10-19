@@ -4,7 +4,7 @@ import { ask, open, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import type { KeyboardEventHandler } from "preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/compat";
 import "./App.css";
-import { NoteCard, TrashCard } from "./components/notecard";
+import { History } from "./components/history";
 import { StatusBar } from "./components/status-bar";
 import { Toast, type ToastMessage } from "./components/toast";
 import { type EditorEvent, NoteEditor } from "./editor";
@@ -36,6 +36,8 @@ function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "edited" | "failed">("saved");
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  // The version the backend installed in the background, waiting for a restart.
+  const [update, setUpdate] = useState<string | null>(null);
   // Editing stays off until the backend confirms the database opened.
   const [startup, setStartup] = useState<{ ready: boolean; error: string | null }>({
     ready: false,
@@ -297,6 +299,9 @@ function App() {
       (error) => setStartup({ ready: true, error }),
       (error) => setStartup({ ready: true, error: String(error) })
     );
+    api.updateReady().then(setUpdate, (error) =>
+      console.error("Loading the update state failed", error)
+    );
   }, []);
 
   // Add menu event listeners
@@ -310,6 +315,7 @@ function App() {
         }
       }),
       listen("flush-and-quit", () => void flushAndQuit()),
+      listen<string>("update-ready", (event) => setUpdate(event.payload)),
     ];
     // Leaving the window (another app, the Dock, logging out) saves right away.
     const onBlur = () => void editor.flush();
@@ -426,55 +432,28 @@ function App() {
           words={stats.words}
           status={status}
           error={notice === null && saveState === "failed"}
+          update={update}
+          onRestart={() => void api.restartToUpdate()}
         />
       </div>
       {showHistory && (
-        <div id="history-container">
-          <div id="history-content-container">
-            <div class="history-header">
-              {showTrash ? (
-                <>
-                  <button type="button" class="link-button" onClick={() => setShowTrash(false)}>
-                    ← Notes
-                  </button>
-                  {trash.length > 0 && (
-                    <button type="button" class="link-button danger" onClick={emptyTrash}>
-                      Empty Trash
-                    </button>
-                  )}
-                </>
-              ) : (
-                <button type="button" class="link-button" onClick={() => setShowTrash(true)}>
-                  Trash
-                </button>
-              )}
-            </div>
-            {showTrash ? (
-              trash.length === 0 ? (
-                <p class="history-empty">Trash is empty</p>
-              ) : (
-                trash.map((n) => (
-                  <TrashCard
-                    key={n.id}
-                    note={n}
-                    onRestore={(id) => void restoreNote(id, false)}
-                    onDelete={deleteForever}
-                  />
-                ))
-              )
-            ) : (
-              notes.map((n) => (
-                <NoteCard
-                  key={n.id}
-                  note={n}
-                  selected={currentId === n.id}
-                  onOpen={openNote}
-                  onTrash={trashNote}
-                />
-              ))
-            )}
-          </div>
-        </div>
+        <History
+          notes={notes}
+          trash={trash}
+          showTrash={showTrash}
+          currentId={currentId}
+          onShowTrash={setShowTrash}
+          onNewNote={() => {
+            if (canEdit.current) {
+              void newNote();
+            }
+          }}
+          onOpen={openNote}
+          onTrash={trashNote}
+          onRestore={(id) => void restoreNote(id, false)}
+          onDeleteForever={deleteForever}
+          onEmptyTrash={emptyTrash}
+        />
       )}
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </div>

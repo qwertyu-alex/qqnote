@@ -34,4 +34,6 @@ export const api = {
   quitCancelled: () => invoke<void>("quit_cancelled"),
   quit: () => invoke<void>("quit"),
   startupError: () => invoke<string | null>("startup_error"),
+  updateReady: () => invoke<string | null>("update_ready"),
+  restartToUpdate: () => invoke<void>("restart_to_update"),
 };

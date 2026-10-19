@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sidebar A · Native list</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      .a {
+        --sidebar-w: 264px;
+      }
+
+      .a .theme-light {
+        --a-side: #f5f5f4;
+        --a-field: rgba(0, 0, 0, 0.055);
+      }
+
+      .a .theme-dark {
+        --a-side: #262626;
+        --a-field: rgba(255, 255, 255, 0.075);
+      }
+
+      .a .sidebar {
+        background: var(--a-side);
+        border-left: 1px solid var(--hairline);
+      }
+
+      .a-head {
+        padding: 10px 10px 6px 14px;
+      }
+
+      .a-top {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 26px;
+        margin-bottom: 8px;
+      }
+
+      .a-top h2 {
+        font: 700 13px system-ui;
+        color: var(--text);
+      }
+
+      .a-count {
+        font: 500 12px system-ui;
+        color: var(--faint);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .a-tools {
+        margin-left: auto;
+        display: flex;
+        gap: 2px;
+      }
+
+      .a-tool {
+        width: 26px;
+        height: 24px;
+        border-radius: 6px;
+        color: var(--muted);
+      }
+
+      .a-search {
+        height: 28px;
+        margin-right: 4px;
+        border-radius: 8px;
+        background: var(--a-field);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 9px;
+        color: var(--faint);
+        font: 13px system-ui;
+      }
+
+      .a-list {
+        padding: 0 6px 12px;
+      }
+
+      .a-group {
+        font: 700 11px system-ui;
+        color: var(--muted);
+        padding: 13px 10px 5px;
+      }
+
+      .a-row {
+        position: relative;
+        padding: 7px 10px 8px;
+        border-radius: 7px;
+      }
+
+      /* Hairlines between rows, hidden around the selected and hovered row. */
+      .a-row + .a-row::before {
+        content: "";
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        top: 0;
+        height: 1px;
+        background: var(--hairline);
+      }
+
+      .a-row.sel::before,
+      .a-row.sel + .a-row::before,
+      .a-row.hover::before,
+      .a-row.hover + .a-row::before {
+        display: none;
+      }
+
+      .a-title {
+        font: 600 13px/17px system-ui;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .a-meta {
+        display: flex;
+        gap: 7px;
+        margin-top: 2px;
+        font: 12px/16px system-ui;
+        white-space: nowrap;
+      }
+
+      .a-time {
+        flex: none;
+        color: var(--text-2);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .a-preview {
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .a-row.sel {
+        background: var(--accent);
+      }
+
+      .a-row.sel .a-title,
+      .a-row.sel .a-time {
+        color: #fff;
+      }
+
+      .a-row.sel .a-preview {
+        color: rgba(255, 255, 255, 0.78);
+      }
+
+      .a-row.hover {
+        background: var(--hover);
+      }
+
+      .a-row.hover .a-title {
+        padding-right: 26px;
+      }
+
+      .a-actions {
+        position: absolute;
+        right: 6px;
+        top: 6px;
+        display: none;
+        gap: 2px;
+      }
+
+      .a-row.hover .a-actions {
+        display: flex;
+      }
+
+      .a-action {
+        width: 24px;
+        height: 22px;
+        border-radius: 5px;
+        color: var(--muted);
+      }
+
+      .a-action.danger {
+        color: var(--danger);
+      }
+
+      /* Trash */
+
+      .a-back {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        margin-left: -4px;
+        padding: 3px 6px 3px 4px;
+        border-radius: 6px;
+        font: 600 13px system-ui;
+        color: var(--accent);
+      }
+
+      .a-empty {
+        margin-left: auto;
+        padding: 3px 7px;
+        border-radius: 6px;
+        font: 500 12px system-ui;
+        color: var(--danger);
+      }
+
+      .a-note {
+        font: 11.5px/1.4 system-ui;
+        color: var(--faint);
+        padding-right: 8px;
+      }
+
+      .a-trash .a-row.hover .a-title {
+        padding-right: 52px;
+      }
+
+      .a-trash .a-title {
+        color: var(--text-2);
+      }
+    </style>
+  </head>
+  <body>
+    <script src="shared.js"></script>
+    <script>
+      function noteRow(r) {
+        const preview = r.preview ? `<span class="a-preview">${esc(r.preview)}</span>` : "";
+        return `<div class="a-row${r.selected ? " sel" : ""}${r.hovered ? " hover" : ""}">
+          <div class="a-title">${esc(r.title)}</div>
+          <div class="a-meta"><span class="a-time">${shortTime(r.date)}</span>${preview}</div>
+          <div class="a-actions"><button class="a-action icon" title="Move to Trash">${ICONS.trash(14)}</button></div>
+        </div>`;
+      }
+
+      function trashRow(r) {
+        return `<div class="a-row${r.hovered ? " hover" : ""}">
+          <div class="a-title">${esc(r.title)}</div>
+          <div class="a-meta"><span class="a-preview">Deleted ${deletedTime(r.date)}</span></div>
+          <div class="a-actions">
+            <button class="a-action icon" title="Restore">${ICONS.restore(14)}</button>
+            <button class="a-action icon danger" title="Delete Forever">${ICONS.x(12)}</button>
+          </div>
+        </div>`;
+      }
+
+      renderBoard({
+        id: "a",
+        name: "A · Native list",
+        tagline:
+          "Feels like Notes or Mail on a Mac. Dense rows (about twice as many notes on screen), date groups, a one-line title with time and preview underneath, and the system accent color for the open note. Header has New Note and Trash buttons, plus a slot for the search you're planning.",
+        sidebar: (view) =>
+          view === "notes"
+            ? `<div class="a-head">
+                <div class="a-top"><h2>Notes</h2><span class="a-count">821</span>
+                  <div class="a-tools">
+                    <button class="a-tool icon" title="New Note (⌘T)">${ICONS.compose(15)}</button>
+                    <button class="a-tool icon" title="Trash">${ICONS.trash(15)}</button>
+                  </div>
+                </div>
+                <div class="a-search">${ICONS.search(12)}Search</div>
+              </div>
+              <div class="a-list">${withGroups(noteRows(), (g) => `<div class="a-group">${g}</div>`, noteRow)}</div>`
+            : `<div class="a-head">
+                <div class="a-top">
+                  <button class="a-back"><span class="icon">${ICONS.back(13)}</span>Notes</button>
+                  <button class="a-empty">Empty Trash</button>
+                </div>
+                <div class="a-top"><h2>Trash</h2><span class="a-count">3</span></div>
+                <div class="a-note">Restore a note to put it back. Emptying the trash deletes these forever.</div>
+              </div>
+              <div class="a-list a-trash">${trashRows().map(trashRow).join("")}</div>`,
+      });
+    </script>
+  </body>
+</html>

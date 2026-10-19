@@ -15,6 +15,9 @@ export function StatusBar(props: {
   words: number;
   status: string | null;
   error: boolean;
+  /** The version that's installed and waiting for a restart. */
+  update: string | null;
+  onRestart: () => void;
 }) {
   const [caret, setCaret] = useState<Caret>(null);
 
@@ -68,6 +71,17 @@ export function StatusBar(props: {
           ? `${numberFormat.format(caret.selectedChars)} of ${count(props.chars, "character")}`
           : count(props.chars, "character")}
       </span>
+      {props.update && (
+        <button
+          type="button"
+          class="status-update"
+          title={`qqnote ${props.update} is installed. Restart to start using it.`}
+          onClick={props.onRestart}
+        >
+          Restart to update
+        </button>
+      )}
+      {props.update && props.status && <span class="status-separator" />}
       {props.status && (
         <span class={`status-end${props.error ? " error" : ""}`}>{props.status}</span>
       )}

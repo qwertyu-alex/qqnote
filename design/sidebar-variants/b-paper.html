@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sidebar B · Paper</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      .b {
+        --sidebar-w: 272px;
+        --serif: ui-serif, "New York", Georgia, serif;
+      }
+
+      .b .theme-light {
+        --b-rule: rgba(0, 0, 0, 0.1);
+      }
+
+      .b .theme-dark {
+        --b-rule: rgba(255, 255, 255, 0.09);
+      }
+
+      /* No panel: the list sits on the editor's paper, behind a thin rule. */
+      .b .sidebar {
+        border-left: 1px solid var(--b-rule);
+      }
+
+      .b-head {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 18px 18px 4px 20px;
+      }
+
+      .b-head h2 {
+        font: 600 22px/1.1 var(--serif);
+        color: var(--text);
+        letter-spacing: -0.01em;
+      }
+
+      .b-count {
+        font: 12px system-ui;
+        color: var(--faint);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .b-link {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font: 12.5px system-ui;
+        color: var(--muted);
+      }
+
+      .b-link.danger {
+        color: var(--danger);
+      }
+
+      .b-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 16px 18px 4px 20px;
+        font: 600 10.5px system-ui;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+
+      .b-group::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--b-rule);
+      }
+
+      .b-row {
+        position: relative;
+        padding: 9px 18px 10px 20px;
+      }
+
+      .b-top {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+
+      .b-title {
+        flex: 1;
+        min-width: 0;
+        font: 500 15.5px/1.28 var(--serif);
+        color: var(--text);
+      }
+
+      .b-time {
+        flex: none;
+        font: 11px system-ui;
+        color: var(--faint);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .b-preview {
+        margin-top: 3px;
+        font: 12.5px/1.4 system-ui;
+        color: var(--muted);
+      }
+
+      /* The open note: an ink mark in the margin. */
+      .b-row.sel::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 11px;
+        bottom: 11px;
+        width: 3px;
+        border-radius: 0 2px 2px 0;
+        background: var(--ink);
+      }
+
+      .b-row.sel .b-title {
+        font-weight: 700;
+      }
+
+      .b-row.hover {
+        background: var(--hover);
+      }
+
+      /* Hovering swaps the time for the delete button. */
+      .b-del {
+        display: none;
+        color: var(--muted);
+        align-self: center;
+      }
+
+      .b-row.hover .b-time {
+        display: none;
+      }
+
+      .b-row.hover .b-del {
+        display: inline-grid;
+      }
+
+      /* Trash */
+
+      .b-trash .b-title {
+        color: var(--muted);
+      }
+
+      .b-actions {
+        display: flex;
+        gap: 14px;
+        margin-top: 6px;
+        font: 600 11px system-ui;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .b-actions .restore {
+        color: var(--text);
+      }
+
+      .b-actions .delete {
+        color: var(--danger);
+      }
+
+      .b-sub {
+        padding: 2px 18px 6px 20px;
+        font: italic 13px/1.4 var(--serif);
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <script src="shared.js"></script>
+    <script>
+      function noteRow(r) {
+        const preview = r.preview ? `<div class="b-preview clamp-2">${esc(r.preview)}</div>` : "";
+        return `<div class="b-row${r.selected ? " sel" : ""}${r.hovered ? " hover" : ""}">
+          <div class="b-top">
+            <div class="b-title clamp-2">${esc(r.title)}</div>
+            <span class="b-time">${shortTime(r.date)}</span>
+            <button class="b-del icon" title="Move to Trash">${ICONS.trash(14)}</button>
+          </div>
+          ${preview}
+        </div>`;
+      }
+
+      function trashRow(r) {
+        const actions = r.hovered
+          ? `<div class="b-actions"><button class="restore">Restore</button><button class="delete">Delete forever</button></div>`
+          : "";
+        return `<div class="b-row${r.hovered ? " hover" : ""}">
+          <div class="b-top">
+            <div class="b-title clamp-2">${esc(r.title)}</div>
+            <span class="b-time">${shortTime(r.date)}</span>
+          </div>
+          ${actions}
+        </div>`;
+      }
+
+      renderBoard({
+        id: "b",
+        name: "B · Paper",
+        tagline:
+          "Matches the serif qq icon. No boxes and no panel: serif titles sit on the same grainy paper as the editor, behind one thin rule. Small-caps date groups, the time on the right (swapped for a delete button on hover), and an ink mark beside the open note.",
+        sidebar: (view) =>
+          view === "notes"
+            ? `<div class="b-head"><h2>Notes</h2><span class="b-count">821</span>
+                <button class="b-link">${ICONS.trash(13)}Trash</button></div>
+              <div>${withGroups(noteRows(), (g) => `<div class="b-group">${g}</div>`, noteRow)}</div>`
+            : `<div class="b-head"><h2>Trash</h2><span class="b-count">3</span>
+                <button class="b-link">${ICONS.back(11)}Notes</button></div>
+              <div class="b-sub">Kept until you empty the trash. <button class="b-link danger" style="display:inline">Empty now</button></div>
+              <div class="b-trash">${withGroups(
+                trashRows().map((r) => {
+                  const g = groupOf(r.date);
+                  const label = { Today: "today", Yesterday: "yesterday", "Previous 7 Days": "this week" }[g] ?? `in ${g}`;
+                  return { ...r, group: `Deleted ${label}` };
+                }),
+                (g) => `<div class="b-group">${g}</div>`,
+                trashRow
+              )}</div>`,
+      });
+    </script>
+  </body>
+</html>

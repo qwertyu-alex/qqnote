@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sidebar C · Soft cards</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      .c {
+        --sidebar-w: 268px;
+      }
+
+      .c .theme-light {
+        --c-tray: #f3f3f1;
+        --c-card: #ffffff;
+        --c-border: rgba(0, 0, 0, 0.07);
+        --c-border-hover: rgba(0, 0, 0, 0.13);
+        --c-seg: rgba(0, 0, 0, 0.06);
+        --c-seg-on: #ffffff;
+        --c-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        --c-shadow-lift: 0 4px 14px rgba(0, 0, 0, 0.08);
+      }
+
+      .c .theme-dark {
+        --c-tray: #171717;
+        --c-card: #262626;
+        --c-border: rgba(255, 255, 255, 0.06);
+        --c-border-hover: rgba(255, 255, 255, 0.12);
+        --c-seg: rgba(255, 255, 255, 0.07);
+        --c-seg-on: #3a3a3a;
+        --c-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        --c-shadow-lift: 0 4px 14px rgba(0, 0, 0, 0.45);
+      }
+
+      /* A recessed tray the cards sit in. */
+      .c .sidebar {
+        background: var(--c-tray);
+        border-left: 1px solid var(--hairline);
+      }
+
+      .c-head {
+        padding: 12px 12px 10px;
+      }
+
+      .c-seg {
+        display: flex;
+        padding: 2px;
+        border-radius: 9px;
+        background: var(--c-seg);
+      }
+
+      .c-seg span {
+        flex: 1;
+        text-align: center;
+        font: 500 12px/24px system-ui;
+        color: var(--muted);
+        border-radius: 7px;
+      }
+
+      .c-seg span.on {
+        background: var(--c-seg-on);
+        color: var(--text);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+      }
+
+      .c-seg em {
+        font-style: normal;
+        color: var(--faint);
+        margin-left: 4px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .c-list {
+        padding: 0 12px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .c-card {
+        position: relative;
+        padding: 10px 12px 9px;
+        border-radius: 10px;
+        background: var(--c-card);
+        border: 1px solid var(--c-border);
+        box-shadow: var(--c-shadow);
+      }
+
+      .c-title {
+        font: 600 13.5px/1.3 system-ui;
+        color: var(--text);
+      }
+
+      .c-preview {
+        margin-top: 3px;
+        font: 12.5px/1.4 system-ui;
+        color: var(--muted);
+      }
+
+      .c-foot {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 7px;
+        font: 11px system-ui;
+        color: var(--faint);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* The open note: an ink ring instead of a heavier shadow. */
+      .c-card.sel {
+        border-color: transparent;
+        box-shadow: 0 0 0 1.5px var(--ink), var(--c-shadow-lift);
+      }
+
+      .c-card.hover {
+        border-color: var(--c-border-hover);
+        box-shadow: var(--c-shadow-lift);
+        transform: translateY(-1px);
+      }
+
+      .c-card.hover .c-title {
+        padding-right: 26px;
+      }
+
+      .c-del {
+        position: absolute;
+        top: 7px;
+        right: 7px;
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        display: none;
+        place-items: center;
+        color: var(--muted);
+        background: var(--c-card);
+        border: 1px solid var(--c-border);
+      }
+
+      .c-card.hover .c-del {
+        display: grid;
+      }
+
+      /* Trash */
+
+      .c-info {
+        display: flex;
+        align-items: center;
+        padding: 0 14px 10px;
+        font: 12px system-ui;
+        color: var(--muted);
+      }
+
+      .c-info .empty {
+        margin-left: auto;
+        font-weight: 500;
+        color: var(--danger);
+      }
+
+      .c-trash .c-title {
+        color: var(--text-2);
+      }
+
+      .c-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 6px;
+        background: var(--c-seg);
+        font: 500 11.5px system-ui;
+        color: var(--text);
+      }
+
+      .c-foot .c-btn:first-of-type {
+        margin-left: auto;
+      }
+
+      .c-btn.danger {
+        color: var(--danger);
+        background: transparent;
+        padding: 0 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="shared.js"></script>
+    <script>
+      function noteCard(r) {
+        const preview = r.preview ? `<div class="c-preview clamp-2">${esc(r.preview)}</div>` : "";
+        return `<div class="c-card${r.selected ? " sel" : ""}${r.hovered ? " hover" : ""}">
+          <div class="c-title clamp-2">${esc(r.title)}</div>
+          ${preview}
+          <div class="c-foot">${relativeTime(r.date)}</div>
+          <button class="c-del" title="Move to Trash">${ICONS.trash(13)}</button>
+        </div>`;
+      }
+
+      function trashCard(r) {
+        return `<div class="c-card">
+          <div class="c-title clamp-2">${esc(r.title)}</div>
+          <div class="c-foot">Deleted ${deletedTime(r.date)}
+            <button class="c-btn">${ICONS.restore(12)}Restore</button>
+            <button class="c-btn danger icon" title="Delete Forever">${ICONS.trash(13)}</button>
+          </div>
+        </div>`;
+      }
+
+      const seg = (on) => `<div class="c-seg">
+        <span class="${on === "notes" ? "on" : ""}">Notes<em>821</em></span>
+        <span class="${on === "trash" ? "on" : ""}">Trash<em>3</em></span>
+      </div>`;
+
+      renderBoard({
+        id: "c",
+        name: "C · Soft cards",
+        tagline:
+          "An evolution of today's cards: lighter and calmer. Cards sit in a recessed tray with rounded corners, a hairline border and a soft shadow, a bold title with a two-line preview, and a readable time. A Notes / Trash switch replaces the text link, and the open note gets an ink ring.",
+        sidebar: (view) =>
+          view === "notes"
+            ? `<div class="c-head">${seg("notes")}</div><div class="c-list">${noteRows().map(noteCard).join("")}</div>`
+            : `<div class="c-head">${seg("trash")}</div>
+              <div class="c-info">3 notes<button class="empty">Empty Trash</button></div>
+              <div class="c-list c-trash">${trashRows().map(trashCard).join("")}</div>`,
+      });
+    </script>
+  </body>
+</html>

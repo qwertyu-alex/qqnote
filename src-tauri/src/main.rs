@@ -16,6 +16,7 @@ mod db;
 mod launcher;
 mod models;
 mod schema;
+mod updater;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 
@@ -33,6 +34,8 @@ struct QuitState {
     // Numbered so a timed-out fallback never acts on a newer request.
     requested: AtomicU64,
     acknowledged: AtomicU64,
+    // Restart into an installed update instead of quitting.
+    restart: AtomicBool,
 }
 
 fn with_db<T>(
@@ -125,7 +128,7 @@ fn request_quit<R: Runtime>(app: &AppHandle<R>) {
     let request = quit.requested.fetch_add(1, Ordering::SeqCst) + 1;
 
     if app.emit("flush-and-quit", ()).is_err() {
-        app.exit(0);
+        finish_quit(app);
         return;
     }
 
@@ -133,9 +136,23 @@ fn request_quit<R: Runtime>(app: &AppHandle<R>) {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(2));
         if app.state::<QuitState>().acknowledged.load(Ordering::SeqCst) < request {
-            app.exit(0);
+            finish_quit(&app);
         }
     });
+}
+
+/// Like `request_quit`, then starts the update `updater` installed.
+fn request_restart<R: Runtime>(app: &AppHandle<R>) {
+    app.state::<QuitState>().restart.store(true, Ordering::SeqCst);
+    request_quit(app);
+}
+
+fn finish_quit<R: Runtime>(app: &AppHandle<R>) {
+    if app.state::<QuitState>().restart.load(Ordering::SeqCst) {
+        updater::restart(app);
+    } else {
+        app.exit(0);
+    }
 }
 
 #[tauri::command]
@@ -146,12 +163,24 @@ fn quit_acknowledged(quit: State<'_, QuitState>) {
 
 #[tauri::command]
 fn quit_cancelled(quit: State<'_, QuitState>) {
+    quit.restart.store(false, Ordering::SeqCst);
     quit.pending.store(false, Ordering::SeqCst);
 }
 
 #[tauri::command]
 fn quit(app: AppHandle) {
-    app.exit(0);
+    finish_quit(&app);
+}
+
+/// The version that's installed and waiting for a restart, if any.
+#[tauri::command]
+fn update_ready(state: State<'_, updater::UpdateState>) -> Option<String> {
+    state.ready()
+}
+
+#[tauri::command]
+fn restart_to_update(app: AppHandle) {
+    request_restart(&app);
 }
 
 fn main() {
@@ -165,7 +194,9 @@ fn main() {
                 .arg(launcher::BACKGROUND_ARG)
                 .build(),
         )
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(QuitState::default())
+        .manage(updater::UpdateState::default())
         .setup(setup_handler)
         .menu(build_menu)
         .on_menu_event(|app, event| {
@@ -187,6 +218,7 @@ fn main() {
                     println!("New note event emitted");
                 }
                 "open_at_login" => launcher::toggle_open_at_login(app),
+                "check_for_updates" => updater::menu_clicked(app),
                 "quit" => request_quit(app),
                 id => {
                     if let Some(appearance) = appearance::Appearance::from_menu_id(id) {
@@ -221,7 +253,9 @@ fn main() {
             quit_acknowledged,
             quit_cancelled,
             quit,
-            startup_error
+            startup_error,
+            update_ready,
+            restart_to_update
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -257,12 +291,16 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // Checked in `launcher::setup`, once the autostart plugin can say if it's on.
     let open_at_login =
         CheckMenuItemBuilder::with_id("open_at_login", "Open at Login").build(app)?;
+    // Becomes Restart to Update once `updater` installs one.
+    let check_for_updates =
+        MenuItemBuilder::with_id("check_for_updates", "Check for Updates…").build(app)?;
     let file_submenu = SubmenuBuilder::with_id(app, "file", "File")
         .item(&new_note)
         .item(&export)
         .item(&import)
         .separator()
         .item(&open_at_login)
+        .item(&check_for_updates)
         .build()?;
 
     // The native Quit item terminates the process immediately; this one saves first.
@@ -346,6 +384,7 @@ fn setup_handler(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error +
 
     appearance::setup(app.handle());
     launcher::setup(app.handle());
+    updater::setup(app.handle());
 
     Ok(())
 }
